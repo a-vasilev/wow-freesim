@@ -7,45 +7,64 @@
  *
  * A theme = a remap of semantic -> primitive (semantic.css). Adding a new
  * palette value here does not, by itself, create any utility class.
+ *
+ * Palette: "Editorial Noir" — a warm near-black ink ramp + an antique-gold
+ * accent ramp, plus WoW-authentic item-quality and tooltip constants. See the
+ * style guide: docs/DESIGN_SYSTEM.md.
  */
 
 :root {
-  /* ── Neutral / gray ─────────────────────────────────────────────── */
-  --gray-50: oklch(0.985 0 0);
-  --gray-100: oklch(0.967 0 0);
-  --gray-200: oklch(0.922 0 0);
-  --gray-300: oklch(0.87 0 0);
-  --gray-400: oklch(0.708 0 0);
-  --gray-500: oklch(0.556 0 0);
-  --gray-600: oklch(0.439 0 0);
-  --gray-700: oklch(0.371 0 0);
-  --gray-800: oklch(0.269 0 0);
-  --gray-900: oklch(0.205 0 0);
-  --gray-950: oklch(0.145 0 0);
+  /* ── Ink (warm neutral; canvas → text) ──────────────────────────── */
+  /* A hint of warm brown/ink undertone, not cold gray. */
+  --ink-950: #0e0c0a; /* app canvas              */
+  --ink-900: #141210; /* raised panels / cards   */
+  --ink-850: #1a1714; /* sidebar / inset wells   */
+  --ink-800: #221f1b; /* overlays / chips / hover*/
+  --ink-750: #2a2620; /* pressed / selected bg   */
+  --ink-700: #332f28; /* subtle borders          */
+  --ink-600: #4a4540; /* default borders         */
+  --ink-500: #6b655c; /* strong borders / faint text */
+  --ink-400: #8f887e; /* subtle text             */
+  --ink-300: #b3aca0; /* muted text              */
+  --ink-200: #d4cec6; /* near-primary text       */
+  --ink-100: #ede9e3; /* primary text            */
+  --ink-50: #f5f2ec; /* brightest text          */
 
-  /* ── Blue (accent family) ───────────────────────────────────────── */
-  --blue-400: oklch(0.707 0.165 254.624);
-  --blue-500: oklch(0.623 0.214 259.815);
-  --blue-600: oklch(0.546 0.245 262.881);
+  /* ── Gold (antique; the sole accent family) ─────────────────────── */
+  --gold-600: #9e7a1a; /* dim / pressed accent    */
+  --gold-500: #b8912e;
+  --gold-400: #c9a24e; /* the accent              */
+  --gold-300: #d9b96a; /* accent hover / glow     */
+  --gold-200: #e8d09a;
+  --gold-100: #f2e5c0;
 
-  /* ── Red (danger) ───────────────────────────────────────────────── */
-  --red-400: oklch(0.704 0.191 22.216);
-  --red-500: oklch(0.637 0.237 25.331);
-  --red-600: oklch(0.577 0.245 27.325);
+  /* ── Functional status (tuned to sit on warm dark) ──────────────── */
+  --green-500: #3f9c5a;
+  --green-400: #5fb977; /* positive delta / success */
+  --red-500: #cf5a52;
+  --red-400: #e07b73; /* negative delta / danger  */
+  --amber-500: #cf9a3a;
+  --amber-400: #e0b056; /* warning                  */
 
-  /* ── Green (success) ────────────────────────────────────────────── */
-  --green-400: oklch(0.792 0.209 151.711);
-  --green-500: oklch(0.723 0.219 149.579);
+  /* ── WoW item-quality constants (GAME-fixed; identical in any theme) ─ */
+  --wow-legendary: #ff8000;
+  --wow-epic: #a335ee;
+  --wow-rare: #0070dd;
+  --wow-uncommon: #1eff00;
+  --wow-common: #9d9d9d;
 
-  /* ── Amber (warning) ────────────────────────────────────────────── */
-  --amber-400: oklch(0.828 0.189 84.429);
-  --amber-500: oklch(0.769 0.188 70.08);
+  /* ── WoW tooltip constants (GAME-fixed; keep authentic) ─────────── */
+  --wow-gold: #ffd100; /* item level + flavor text */
+  --wow-green: #1eff00; /* enchants / use & equip effects */
+  --wow-blue: #aad4f7; /* upgrade track / secondary info */
 
-  /* ── Categorical chart hues (data viz, e.g. ability breakdown) ──── */
-  --hue-1: oklch(0.707 0.165 254.624); /* blue   */
-  --hue-2: oklch(0.769 0.188 70.08); /* amber  */
-  --hue-3: oklch(0.723 0.219 149.579); /* green  */
-  --hue-4: oklch(0.637 0.237 25.331); /* red    */
-  --hue-5: oklch(0.627 0.265 303.9); /* purple */
-  --hue-6: oklch(0.745 0.16 232.661); /* cyan   */
+  /* ── Categorical chart hues (multi-series data viz) ─────────────── */
+  /* Harmonized for the warm-dark canvas; hue-1 is the accent gold so a
+     single-series chart matches the rest of the UI. */
+  --hue-1: #c9a24e; /* gold   */
+  --hue-2: #5bb3b0; /* teal   */
+  --hue-3: #a07cc9; /* violet */
+  --hue-4: #cf8a52; /* amber-orange */
+  --hue-5: #6f9ed6; /* blue   */
+  --hue-6: #cf6f72; /* rose   */
 }

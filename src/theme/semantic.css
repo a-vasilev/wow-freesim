@@ -3,47 +3,79 @@
  * (indirectly, via the Tailwind utilities wired up in theme.css).
  *
  * A theme is exactly one block below: a remap of semantic -> primitive under a
- * [data-theme="..."] selector on <html>. Day one ships a single neutral
- * placeholder theme. Adding/replacing a theme later = add one more block; no
+ * [data-theme="..."] selector on <html>. Day one ships the "noir" theme
+ * ("Editorial Noir"). Adding/replacing a theme later = add one more block; no
  * component changes. The :root selector duplicates the default so the tokens
  * still resolve if the attribute is ever missing (avoids FOUC).
  *
- * theme.css binds these `--c-*` / `--sem-*` vars into Tailwind's token
- * namespaces so they become utilities (bg-surface, text-fg, rounded-md, …).
+ * theme.css binds these `--c-*` vars into Tailwind's token namespaces so they
+ * become utilities (bg-surface, text-fg, rounded-md, …).
+ *
+ * NOTE: the `--c-quality-*` and `--c-tooltip-*` tokens map to WoW GAME
+ * CONSTANTS (item rarity colors, the in-game tooltip palette). They are kept as
+ * tokens for consistency, but a future theme should not recolor them — players
+ * rely on them being identical to the game.
  */
 
 :root,
-[data-theme='neutral'] {
-  /* Surfaces */
-  --c-surface: var(--gray-950);
-  --c-surface-raised: var(--gray-900);
-  --c-surface-overlay: var(--gray-800);
+[data-theme='noir'] {
+  /* ── Surfaces (canvas → overlay) ───────────────────────────────── */
+  --c-surface: var(--ink-950); /* app canvas */
+  --c-surface-raised: var(--ink-900); /* cards / panels / report blocks */
+  --c-surface-inset: var(--ink-850); /* sidebar, sunken wells, code box */
+  --c-surface-overlay: var(--ink-800); /* popovers, menus, chips, row hover */
 
-  /* Foreground (text) */
-  --c-fg: var(--gray-50);
-  --c-fg-muted: var(--gray-400);
-  --c-fg-subtle: var(--gray-500);
+  /* ── Foreground (text) ─────────────────────────────────────────── */
+  --c-fg: var(--ink-100); /* primary */
+  --c-fg-muted: var(--ink-300); /* secondary */
+  --c-fg-subtle: var(--ink-400); /* tertiary / labels */
+  --c-fg-faint: var(--ink-500); /* placeholders / disabled / faint meta */
 
-  /* Borders / lines */
-  --c-border: var(--gray-800);
-  --c-border-strong: var(--gray-700);
+  /* ── Borders / lines ───────────────────────────────────────────── */
+  --c-border-subtle: var(--ink-700); /* hairline dividers (the default rule) */
+  --c-border: var(--ink-600); /* standard control border */
+  --c-border-strong: var(--ink-500); /* emphasized border */
 
-  /* Accent / interactive */
-  --c-accent: var(--blue-500);
-  --c-accent-hover: var(--blue-400);
-  --c-accent-fg: var(--gray-50);
+  /* ── Accent / interactive (antique gold) ───────────────────────── */
+  --c-accent: var(--gold-400);
+  --c-accent-hover: var(--gold-300);
+  --c-accent-dim: var(--gold-600);
+  --c-accent-fg: var(--ink-950); /* text/icon ON a gold fill (gold is light) */
+  --c-accent-subtle: rgba(201, 162, 78, 0.12); /* tinted highlight bg */
+  --c-accent-glow: rgba(201, 162, 78, 0.2); /* focus glow / CTA shadow */
 
-  /* Status */
+  /* ── Status ────────────────────────────────────────────────────── */
   --c-danger: var(--red-500);
-  --c-danger-fg: var(--gray-50);
+  --c-danger-fg: var(--ink-50);
   --c-success: var(--green-500);
   --c-warning: var(--amber-400);
 
-  /* Focus ring */
-  --c-focus: var(--blue-400);
+  /* ── Focus ring ────────────────────────────────────────────────── */
+  --c-focus: var(--gold-300);
 
-  /* Data viz */
-  --c-dps: var(--blue-400);
+  /* ── WoW item-quality (game constant; do not recolor per theme) ──── */
+  --c-quality-legendary: var(--wow-legendary);
+  --c-quality-epic: var(--wow-epic);
+  --c-quality-rare: var(--wow-rare);
+  --c-quality-uncommon: var(--wow-uncommon);
+  --c-quality-common: var(--wow-common);
+
+  /* ── WoW tooltip (game-authentic; keep familiar to players) ──────── */
+  --c-tooltip-bg: rgba(0, 0, 0, 0.92);
+  --c-tooltip-ilvl: var(--wow-gold); /* "Item Level 645" + flavor text */
+  --c-tooltip-effect: var(--wow-green); /* enchants, Use:/Equip: effects */
+  --c-tooltip-info: var(--wow-blue); /* upgrade track, secondary info */
+  --c-tooltip-disabled: var(--wow-common); /* unmet requirements */
+
+  /* ── Data viz ──────────────────────────────────────────────────── */
+  --c-dps: var(--gold-400); /* the DPS series / headline accent */
+  --c-bar: var(--gold-400); /* breakdown / candidate bars */
+  --c-bar-track: var(--ink-800); /* bar background track */
+  --c-delta-positive: var(--green-400); /* Top Gear gain */
+  --c-delta-negative: var(--red-400); /* Top Gear loss */
+  --c-chart-grid: var(--ink-800); /* gridlines */
+  --c-chart-axis: var(--ink-500); /* axis ticks / labels */
+  --c-chart-mean: var(--gold-300); /* distribution mean marker */
   --c-chart-1: var(--hue-1);
   --c-chart-2: var(--hue-2);
   --c-chart-3: var(--hue-3);

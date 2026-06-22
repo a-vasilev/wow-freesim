@@ -1,0 +1,2092 @@
+<!doctype html>
+<html lang="en" data-theme="noir">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FreeSim — Gear / Top Gear</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ============================================================
+     DESIGN TOKEN SYSTEM — two-tier: primitives → semantic
+     ============================================================ */
+
+      /* --- Primitive palette (never reference directly in markup) --- */
+      :root {
+        --_p-ink-950: #0e0c0a;
+        --_p-ink-900: #141210;
+        --_p-ink-850: #1a1714;
+        --_p-ink-800: #221f1b;
+        --_p-ink-750: #2a2620;
+        --_p-ink-700: #332f28;
+        --_p-ink-600: #4a4540;
+        --_p-ink-500: #6b655c;
+        --_p-ink-400: #8f887e;
+        --_p-ink-300: #b3aca0;
+        --_p-ink-200: #d4cec6;
+        --_p-ink-100: #ede9e3;
+        --_p-ink-50: #f5f2ec;
+
+        /* Gold scale — antique */
+        --_p-gold-400: #c9a24e;
+        --_p-gold-500: #b8912e;
+        --_p-gold-600: #9e7a1a;
+        --_p-gold-300: #d9b96a;
+        --_p-gold-200: #e8d09a;
+        --_p-gold-100: #f2e5c0;
+
+        /* WoW quality colors */
+        --_p-legendary: #ff8000;
+        --_p-epic: #a335ee;
+        --_p-rare: #0070dd;
+        --_p-uncommon: #1eff00;
+        --_p-common: #9d9d9d;
+        --_p-wow-gold: #ffd100;
+        --_p-wow-green: #1eff00;
+        --_p-wow-blue: #aad4f7;
+
+        /* Typography — Space Grotesk for display/headings, Inter for body */
+        --_p-font-display: 'Space Grotesk', system-ui, sans-serif;
+        --_p-font-sans: 'Inter', system-ui, sans-serif;
+      }
+
+      /* --- Semantic tokens --- */
+      [data-theme='noir'] {
+        --color-canvas: var(--_p-ink-950);
+        --color-surface-0: var(--_p-ink-900);
+        --color-surface-1: var(--_p-ink-850);
+        --color-surface-2: var(--_p-ink-800);
+        --color-surface-3: var(--_p-ink-750);
+        --color-surface-raised: var(--_p-ink-700);
+
+        --color-border-subtle: var(--_p-ink-700);
+        --color-border-default: var(--_p-ink-600);
+        --color-border-strong: var(--_p-ink-500);
+
+        --color-text-primary: var(--_p-ink-100);
+        --color-text-secondary: var(--_p-ink-300);
+        --color-text-muted: var(--_p-ink-400);
+        --color-text-faint: var(--_p-ink-500);
+
+        --color-accent: var(--_p-gold-400);
+        --color-accent-dim: var(--_p-gold-600);
+        --color-accent-subtle: rgba(201, 162, 78, 0.12);
+        --color-accent-glow: rgba(201, 162, 78, 0.2);
+
+        --font-display: var(--_p-font-display);
+        --font-body: var(--_p-font-sans);
+
+        --radius-sm: 2px;
+        --radius-md: 4px;
+        --radius-lg: 6px;
+
+        --shadow-slot: 0 2px 12px rgba(0, 0, 0, 0.6);
+        --shadow-tooltip: 0 8px 40px rgba(0, 0, 0, 0.85), 0 2px 8px rgba(0, 0, 0, 0.6);
+        --shadow-panel: 0 4px 24px rgba(0, 0, 0, 0.5);
+
+        --sidebar-width: 220px;
+      }
+
+      /* ============================================================
+     RESET & BASE
+     ============================================================ */
+      *, *::before, *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html {
+        font-size: 15px;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: optimizeLegibility;
+      }
+
+      body {
+        background-color: var(--color-canvas);
+        color: var(--color-text-primary);
+        font-family: var(--font-body);
+        font-weight: 400;
+        line-height: 1.5;
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+
+      /* Tabular figures on all numbers */
+      .num {
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: 'tnum' 1;
+      }
+
+      /* ============================================================
+     CAPTION STRIP
+     ============================================================ */
+      .caption-strip {
+        background: var(--color-surface-2);
+        border-bottom: 1px solid var(--color-border-subtle);
+        color: var(--color-text-muted);
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 6px 32px;
+        text-align: center;
+        position: relative;
+        z-index: 200;
+      }
+
+      /* ============================================================
+     APP SHELL — sidebar + main
+     ============================================================ */
+      .app-shell {
+        display: flex;
+        min-height: calc(100vh - 29px); /* subtract caption strip */
+      }
+
+      /* ============================================================
+     LEFT SIDEBAR
+     ============================================================ */
+      .sidebar {
+        width: var(--sidebar-width);
+        flex-shrink: 0;
+        background: var(--color-surface-1);
+        border-right: 1px solid var(--color-border-subtle);
+        display: flex;
+        flex-direction: column;
+        position: sticky;
+        top: 29px; /* caption strip height */
+        height: calc(100vh - 29px);
+        overflow-y: auto;
+      }
+
+      /* Brand block */
+      .sidebar-brand {
+        padding: 24px 20px 20px;
+        border-bottom: 1px solid var(--color-border-subtle);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        text-decoration: none;
+        flex-shrink: 0;
+      }
+
+      .sidebar-mark {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+      }
+
+      /* Wordmark: Space Grotesk, medium weight, tight tracking */
+      .sidebar-wordmark {
+        font-family: var(--font-display);
+        font-size: 17px;
+        font-weight: 500;
+        letter-spacing: -0.02em;
+        color: var(--color-text-primary);
+        line-height: 1;
+        user-select: none;
+        position: relative;
+      }
+
+      /* Gold diamond on the "i" in FreeSim */
+      .sidebar-wordmark .wm-i-wrap {
+        position: relative;
+        display: inline-block;
+      }
+      .sidebar-wordmark .wm-i-dot {
+        position: absolute;
+        top: -2px;
+        left: 50%;
+        transform: translateX(-50%) rotate(45deg);
+        width: 4px;
+        height: 4px;
+        background: var(--color-accent);
+        border-radius: 1px;
+        pointer-events: none;
+      }
+
+      /* Nav items */
+      .sidebar-nav {
+        padding: 10px 0;
+        flex: 1;
+      }
+
+      .sidebar-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 11px 20px;
+        cursor: pointer;
+        position: relative;
+        transition: background 0.12s;
+        text-decoration: none;
+      }
+
+      .sidebar-item:hover {
+        background: var(--color-surface-2);
+      }
+
+      .sidebar-item.active {
+        background: var(--color-accent-subtle);
+      }
+
+      /* Gold left marker on active item */
+      .sidebar-item.active::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 8px;
+        bottom: 8px;
+        width: 2px;
+        background: var(--color-accent);
+        border-radius: 2px;
+      }
+
+      .sidebar-icon {
+        width: 16px;
+        height: 16px;
+        color: var(--color-text-muted);
+        flex-shrink: 0;
+      }
+
+      .sidebar-item.active .sidebar-icon {
+        color: var(--color-accent);
+      }
+
+      .sidebar-item-label {
+        font-family: var(--font-body);
+        font-size: 13px;
+        font-weight: 400;
+        color: var(--color-text-muted);
+        letter-spacing: 0.01em;
+      }
+
+      .sidebar-item.active .sidebar-item-label {
+        color: var(--color-accent);
+        font-weight: 500;
+      }
+
+      .sidebar-item:hover:not(.active) .sidebar-item-label {
+        color: var(--color-text-secondary);
+      }
+
+      .sidebar-item:hover:not(.active) .sidebar-icon {
+        color: var(--color-text-secondary);
+      }
+
+      /* Sidebar footer */
+      .sidebar-footer {
+        padding: 14px 16px;
+        border-top: 1px solid var(--color-border-subtle);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+      }
+
+      .engine-chip {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 10.5px;
+        font-weight: 500;
+        color: var(--color-text-muted);
+        letter-spacing: 0.03em;
+      }
+
+      .engine-dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: #3dd68c;
+        box-shadow: 0 0 6px rgba(61, 214, 140, 0.6);
+        flex-shrink: 0;
+      }
+
+      .settings-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--color-text-muted);
+        display: flex;
+        align-items: center;
+        padding: 5px;
+        border-radius: var(--radius-md);
+        transition: color 0.15s;
+      }
+
+      .settings-btn:hover {
+        color: var(--color-text-secondary);
+      }
+
+      /* ============================================================
+     MAIN CONTENT AREA
+     ============================================================ */
+      .main-content {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* ============================================================
+     IN-CONTENT HEADER STRIP
+     ============================================================ */
+      .content-header {
+        background: var(--color-surface-0);
+        border-bottom: 1px solid var(--color-border-subtle);
+        padding: 0 28px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        height: 52px;
+        flex-shrink: 0;
+        position: sticky;
+        top: 29px;
+        z-index: 50;
+      }
+
+      /* Left: breadcrumb + sub-tabs */
+      .header-left {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-shrink: 0;
+      }
+
+      .header-title {
+        font-family: var(--font-display);
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--color-text-secondary);
+        letter-spacing: -0.01em;
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: 'tnum' 1;
+      }
+
+      .header-subtabs {
+        display: flex;
+        align-items: stretch;
+        gap: 0;
+        height: 100%;
+        margin-left: 4px;
+      }
+
+      .header-subtab {
+        display: flex;
+        align-items: center;
+        padding: 0 14px;
+        font-size: 11.5px;
+        font-weight: 500;
+        color: var(--color-text-muted);
+        letter-spacing: 0.04em;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        position: relative;
+        top: 1px;
+        transition: color 0.12s, border-color 0.12s;
+        text-decoration: none;
+        user-select: none;
+      }
+
+      .header-subtab:hover {
+        color: var(--color-text-secondary);
+      }
+
+      .header-subtab.active {
+        color: var(--color-accent);
+        border-bottom-color: var(--color-accent);
+        font-weight: 600;
+      }
+
+      /* Right: sim setting chips */
+      .header-right {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: nowrap;
+      }
+
+      .sim-chip-label {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--color-text-faint);
+        margin-right: 2px;
+        white-space: nowrap;
+      }
+
+      .sim-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 10px;
+        background: var(--color-surface-2);
+        border: 1px solid var(--color-border-subtle);
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--color-text-secondary);
+        letter-spacing: 0.02em;
+        white-space: nowrap;
+        cursor: default;
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: 'tnum' 1;
+      }
+
+      .sim-chip-key {
+        font-size: 9.5px;
+        font-weight: 600;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        color: var(--color-text-faint);
+      }
+
+      .sim-chip-val {
+        color: var(--color-text-secondary);
+      }
+
+      .sim-chip-sep {
+        width: 1px;
+        height: 12px;
+        background: var(--color-border-subtle);
+        margin: 0 2px;
+      }
+
+      /* ============================================================
+     PAGE CONTENT
+     ============================================================ */
+      .page {
+        padding: 24px 28px 80px;
+        flex: 1;
+      }
+
+      /* ============================================================
+     CHARACTER CONTEXT BAR
+     ============================================================ */
+      .char-context {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        margin-bottom: 24px;
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--color-border-subtle);
+        flex-wrap: wrap;
+      }
+
+      .char-name-block {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      /* Character name: Space Grotesk, clean + precise */
+      .char-name {
+        font-family: var(--font-display);
+        font-size: 26px;
+        font-weight: 600;
+        color: var(--color-text-primary);
+        line-height: 1;
+        letter-spacing: -0.02em;
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: 'tnum' 1;
+      }
+
+      .char-sep {
+        color: var(--color-text-faint);
+        font-size: 14px;
+      }
+
+      .char-spec {
+        font-size: 12px;
+        font-weight: 500;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--color-text-secondary);
+      }
+
+      .char-ilvl {
+        font-family: var(--font-display);
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--color-accent);
+        letter-spacing: -0.01em;
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: 'tnum' 1;
+      }
+
+      .char-context-actions {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .equipped-chip {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 12px;
+        background: var(--color-surface-2);
+        border: 1px solid var(--color-border-subtle);
+        border-radius: 20px;
+        font-size: 11.5px;
+        color: var(--color-text-muted);
+        letter-spacing: 0.03em;
+      }
+
+      .equipped-chip strong {
+        font-family: var(--font-display);
+        color: var(--color-text-secondary);
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: 'tnum' 1;
+      }
+
+      .btn-run-topgear {
+        padding: 9px 20px;
+        background: var(--color-accent);
+        border: none;
+        border-radius: var(--radius-md);
+        font-family: var(--font-display);
+        font-size: 11.5px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--_p-ink-950);
+        cursor: pointer;
+        transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: 'tnum' 1;
+      }
+
+      .btn-run-topgear:hover {
+        background: var(--_p-gold-300);
+        box-shadow: 0 4px 20px var(--color-accent-glow);
+        transform: translateY(-1px);
+      }
+
+      /* ============================================================
+     MAIN TWO-PANE LAYOUT
+     ============================================================ */
+      .main-panes {
+        display: grid;
+        grid-template-columns: 310px 1fr;
+        gap: 20px;
+        align-items: start;
+      }
+
+      /* ============================================================
+     LEFT PANEL — EQUIPPED GEAR
+     ============================================================ */
+      .equipped-panel {
+        background: var(--color-surface-0);
+        border: 1px solid var(--color-border-subtle);
+        border-radius: var(--radius-lg);
+        overflow: visible;
+      }
+
+      .panel-header {
+        padding: 12px 14px 10px;
+        border-bottom: 1px solid var(--color-border-subtle);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .panel-title {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--color-text-muted);
+      }
+
+      .panel-ilvl {
+        font-family: var(--font-display);
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--color-accent);
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: 'tnum' 1;
+        letter-spacing: -0.01em;
+      }
+
+      /* Two-column slot grid */
+      .slots-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px;
+        padding: 8px;
+      }
+
+      .slots-weapons {
+        padding: 0 8px 8px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px;
+      }
+
+      /* ============================================================
+     GEAR SLOT TILE (compact, icon-forward)
+     ============================================================ */
+      .slot-tile {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 5px 7px;
+        background: var(--color-surface-1);
+        border: 1px solid var(--color-border-subtle);
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+        overflow: visible;
+        min-width: 0;
+      }
+
+      .slot-tile:hover {
+        background: var(--color-surface-2);
+        border-color: var(--color-border-default);
+        box-shadow: var(--shadow-slot);
+        z-index: 20;
+      }
+
+      /* Selected state — gold ring */
+      .slot-tile.selected {
+        border-color: var(--color-accent);
+        background: var(--color-accent-subtle);
+        box-shadow: 0 0 0 1px var(--color-accent), 0 2px 16px rgba(201, 162, 78, 0.18);
+        z-index: 5;
+      }
+
+      /* Quality left-stripe */
+      .slot-tile::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 5px;
+        bottom: 5px;
+        width: 2px;
+        border-radius: 2px;
+        background: var(--slot-quality-color, var(--color-border-default));
+        opacity: 0.85;
+      }
+
+      .slot-tile.quality-epic   { --slot-quality-color: var(--_p-epic); }
+      .slot-tile.quality-legendary { --slot-quality-color: var(--_p-legendary); }
+      .slot-tile.quality-rare   { --slot-quality-color: var(--_p-rare); }
+      .slot-tile.quality-empty  { --slot-quality-color: var(--_p-ink-600); opacity: 0.45; pointer-events: none; }
+
+      /* Slot icon — real WoW img */
+      .slot-icon {
+        position: relative;
+        width: 34px;
+        height: 34px;
+        flex-shrink: 0;
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+        border: 1px solid var(--slot-quality-color, var(--color-border-default));
+      }
+
+      .slot-icon img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+
+      /* ilvl badge overlaid on icon */
+      .slot-ilvl-badge {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        background: rgba(10, 8, 6, 0.82);
+        font-size: 9px;
+        font-weight: 700;
+        line-height: 1;
+        padding: 1px 3px;
+        color: var(--_p-ink-200);
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: 'tnum' 1;
+        border-radius: 1px 0 0 0;
+        font-family: var(--font-display);
+      }
+
+      .slot-tile.quality-legendary .slot-ilvl-badge { color: var(--_p-legendary); }
+
+      /* Slot text */
+      .slot-info {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .slot-label {
+        font-size: 9px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--color-text-faint);
+        line-height: 1;
+        margin-bottom: 3px;
+      }
+
+      .slot-name {
+        font-size: 10.5px;
+        font-weight: 400;
+        color: var(--color-text-secondary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        line-height: 1.3;
+      }
+
+      .slot-tile.quality-epic .slot-name       { color: rgba(163, 53, 238, 0.9); }
+      .slot-tile.quality-legendary .slot-name  { color: rgba(255, 128, 0, 0.95); }
+      .slot-tile.quality-rare .slot-name       { color: rgba(0, 112, 221, 0.9); }
+      .slot-tile.quality-empty .slot-name      { color: var(--color-text-faint); font-style: italic; }
+
+      /* Selected state label */
+      .slot-tile.selected .slot-label { color: var(--color-accent); opacity: 0.9; }
+
+      /* ============================================================
+     WOW TOOLTIP
+     ============================================================ */
+      .wow-tooltip {
+        position: absolute;
+        left: calc(100% + 10px);
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 500;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.1s;
+        width: 320px;
+      }
+
+      /* Right column: tooltip goes left */
+      .slots-grid .slot-tile:nth-child(even) .wow-tooltip,
+      .slots-weapons .slot-tile:nth-child(even) .wow-tooltip {
+        left: auto;
+        right: calc(100% + 10px);
+      }
+
+      /* Weapons row: tooltip goes up */
+      .slots-weapons .wow-tooltip {
+        left: 50%;
+        top: auto;
+        bottom: calc(100% + 10px);
+        transform: translateX(-50%);
+      }
+
+      .slot-tile:hover .wow-tooltip,
+      .slot-tile.tooltip-pinned .wow-tooltip {
+        opacity: 1;
+      }
+
+      .wow-tooltip-inner {
+        background: rgba(10, 8, 6, 0.97);
+        border: 1px solid;
+        border-radius: 2px;
+        padding: 10px 12px;
+        font-family: var(--font-body);
+        font-size: 13px;
+        line-height: 1.45;
+        box-shadow: var(--shadow-tooltip);
+        min-width: 300px;
+        max-width: 340px;
+      }
+
+      .wow-tooltip-inner.quality-epic      { border-color: var(--_p-epic); }
+      .wow-tooltip-inner.quality-legendary { border-color: var(--_p-legendary); }
+      .wow-tooltip-inner.quality-rare      { border-color: var(--_p-rare); }
+
+      .tt-name { font-size: 14.5px; font-weight: 600; margin-bottom: 2px; line-height: 1.3; }
+      .tt-name.quality-epic      { color: var(--_p-epic); }
+      .tt-name.quality-legendary { color: var(--_p-legendary); }
+      .tt-name.quality-rare      { color: var(--_p-rare); }
+
+      .tt-ilvl    { color: var(--_p-wow-gold); font-size: 13px; margin-bottom: 1px; }
+      .tt-upgrade { color: var(--_p-wow-blue); font-size: 12.5px; margin-bottom: 3px; }
+      .tt-divider { border: none; border-top: 1px solid rgba(255,255,255,0.08); margin: 5px 0; }
+      .tt-white   { color: #e8e8e8; font-size: 13px; }
+      .tt-gray    { color: var(--_p-common); font-size: 12.5px; }
+      .tt-row     { display: flex; justify-content: space-between; color: #e8e8e8; font-size: 13px; }
+      .tt-stat    { color: #e8e8e8; font-size: 13px; }
+      .tt-green   { color: var(--_p-wow-green); font-size: 13px; }
+      .tt-gem     { display: flex; align-items: center; gap: 6px; color: var(--_p-wow-blue); font-size: 13px; }
+      .tt-gem svg { width: 10px; height: 10px; flex-shrink: 0; }
+      .tt-flavor  { color: var(--_p-wow-gold); font-style: italic; font-size: 12.5px; margin-top: 4px; }
+      .tt-dur     { color: #b8b8b8; font-size: 12px; }
+      .tt-req     { color: #b8b8b8; font-size: 12px; }
+      .tt-dps-row { display: flex; justify-content: space-between; align-items: baseline; }
+      .tt-damage  { color: #e8e8e8; font-size: 13px; }
+      .tt-dps     { color: #e8e8e8; font-size: 13px; }
+
+      /* ============================================================
+     RIGHT PANEL — TOP GEAR PICKER
+     ============================================================ */
+      .topgear-panel {
+        background: var(--color-surface-0);
+        border: 1px solid var(--color-border-subtle);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .topgear-header {
+        padding: 16px 22px 12px;
+        border-bottom: 1px solid var(--color-border-subtle);
+      }
+
+      /* Top Gear panel title: Space Grotesk, clean */
+      .topgear-title {
+        font-family: var(--font-display);
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--color-text-primary);
+        line-height: 1;
+        margin-bottom: 4px;
+        letter-spacing: -0.02em;
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: 'tnum' 1;
+      }
+
+      .topgear-title span {
+        color: var(--color-accent);
+      }
+
+      .topgear-subtitle {
+        font-size: 11.5px;
+        color: var(--color-text-muted);
+        letter-spacing: 0.03em;
+      }
+
+      /* Candidate list */
+      .candidates-list {
+        flex: 1;
+      }
+
+      .candidate-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 11px 20px;
+        border-bottom: 1px solid var(--color-border-subtle);
+        transition: background 0.12s;
+        cursor: pointer;
+        position: relative;
+      }
+
+      .candidate-row:last-child { border-bottom: none; }
+
+      .candidate-row:hover { background: var(--color-surface-1); }
+
+      /* Winner row highlight */
+      .candidate-row.winner {
+        background: rgba(201, 162, 78, 0.06);
+        border-bottom-color: var(--color-border-subtle);
+      }
+      .candidate-row.winner:hover { background: rgba(201, 162, 78, 0.1); }
+
+      /* Equipped row */
+      .candidate-row.equipped-row { background: rgba(163, 53, 238, 0.05); }
+      .candidate-row.equipped-row:hover { background: rgba(163, 53, 238, 0.09); }
+
+      /* Checkbox */
+      .cand-check {
+        flex-shrink: 0;
+        width: 16px;
+        height: 16px;
+        appearance: none;
+        -webkit-appearance: none;
+        background: var(--color-surface-2);
+        border: 1px solid var(--color-border-default);
+        border-radius: 3px;
+        cursor: pointer;
+        position: relative;
+        transition: background 0.12s, border-color 0.12s;
+      }
+
+      .cand-check:checked {
+        background: var(--color-accent);
+        border-color: var(--color-accent);
+      }
+
+      .cand-check:checked::after {
+        content: '';
+        position: absolute;
+        left: 4px;
+        top: 1.5px;
+        width: 5px;
+        height: 8px;
+        border: 2px solid var(--_p-ink-950);
+        border-top: none;
+        border-left: none;
+        transform: rotate(45deg);
+      }
+
+      /* Item icon */
+      .cand-icon {
+        position: relative;
+        width: 40px;
+        height: 40px;
+        flex-shrink: 0;
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+        border: 1px solid;
+      }
+
+      .cand-icon.quality-epic      { border-color: rgba(163, 53, 238, 0.55); }
+      .cand-icon.quality-legendary { border-color: rgba(255, 128, 0, 0.55); }
+      .cand-icon.quality-rare      { border-color: rgba(0, 112, 221, 0.55); }
+
+      .cand-icon img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+
+      /* Item info block */
+      .cand-info {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .cand-name-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 3px;
+      }
+
+      .cand-name {
+        font-size: 13px;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .cand-name.quality-epic      { color: var(--_p-epic); }
+      .cand-name.quality-legendary { color: var(--_p-legendary); }
+      .cand-name.quality-rare      { color: var(--_p-rare); }
+
+      .cand-ilvl {
+        font-family: var(--font-display);
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--color-text-muted);
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: 'tnum' 1;
+        flex-shrink: 0;
+        letter-spacing: -0.01em;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 1px 6px;
+        border-radius: 10px;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        flex-shrink: 0;
+        white-space: nowrap;
+      }
+
+      .badge-equipped {
+        background: rgba(163, 53, 238, 0.15);
+        color: var(--_p-epic);
+        border: 1px solid rgba(163, 53, 238, 0.3);
+      }
+
+      .badge-winner {
+        background: rgba(201, 162, 78, 0.15);
+        color: var(--color-accent);
+        border: 1px solid rgba(201, 162, 78, 0.3);
+      }
+
+      .cand-meta-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .cand-source {
+        font-size: 11px;
+        color: var(--color-text-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 200px;
+      }
+
+      .stat-tag {
+        display: inline-flex;
+        align-items: center;
+        padding: 1px 6px;
+        background: var(--color-surface-2);
+        border: 1px solid var(--color-border-subtle);
+        border-radius: 10px;
+        font-size: 10px;
+        font-weight: 500;
+        color: var(--color-text-muted);
+        white-space: nowrap;
+        letter-spacing: 0.04em;
+      }
+
+      /* DPS / delta column */
+      .cand-dps-col {
+        flex-shrink: 0;
+        width: 130px;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 4px;
+      }
+
+      .cand-dps {
+        font-family: var(--font-display);
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--color-text-primary);
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: 'tnum' 1;
+        white-space: nowrap;
+        letter-spacing: -0.02em;
+      }
+
+      .cand-delta {
+        font-family: var(--font-display);
+        font-size: 11px;
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: 'tnum' 1;
+        white-space: nowrap;
+        letter-spacing: -0.01em;
+      }
+
+      .delta-neutral { color: var(--color-text-muted); }
+      .delta-pos     { color: #3dd68c; }
+      .delta-neg     { color: #e05252; }
+
+      /* DPS bar */
+      .cand-bar-wrap {
+        width: 100%;
+        height: 3px;
+        background: var(--color-surface-2);
+        border-radius: 2px;
+        overflow: hidden;
+        margin-top: 2px;
+      }
+
+      .cand-bar {
+        height: 100%;
+        border-radius: 2px;
+        background: var(--color-border-default);
+        transition: width 0.3s;
+      }
+
+      .candidate-row.winner   .cand-bar { background: var(--color-accent); }
+      .candidate-row.equipped-row .cand-bar { background: rgba(163, 53, 238, 0.6); }
+      .delta-pos-bar { background: #3dd68c; }
+      .delta-neg-bar { background: #e05252; opacity: 0.6; }
+
+      /* Unchecked rows: dimmed */
+      .candidate-row.unchecked { opacity: 0.6; }
+
+      /* Tooltip on candidate rows */
+      .candidate-row .wow-tooltip {
+        position: absolute;
+        left: auto;
+        right: calc(100% + 10px);
+        top: 50%;
+        bottom: auto;
+        transform: translateY(-50%);
+        width: 320px;
+        z-index: 600;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.1s;
+      }
+
+      .candidate-row:hover .wow-tooltip { opacity: 1; }
+
+      /* ============================================================
+     PICKER FOOTER
+     ============================================================ */
+      .topgear-footer {
+        padding: 14px 20px;
+        border-top: 1px solid var(--color-border-subtle);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: var(--color-surface-0);
+      }
+
+      .footer-meta {
+        font-size: 11.5px;
+        color: var(--color-text-muted);
+      }
+
+      .footer-meta strong {
+        font-family: var(--font-display);
+        color: var(--color-text-secondary);
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: 'tnum' 1;
+      }
+
+      .btn-run-selected {
+        padding: 10px 24px;
+        background: var(--color-accent);
+        border: none;
+        border-radius: var(--radius-md);
+        font-family: var(--font-display);
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--_p-ink-950);
+        cursor: pointer;
+        transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: 'tnum' 1;
+      }
+
+      .btn-run-selected:hover {
+        background: var(--_p-gold-300);
+        box-shadow: 0 4px 20px var(--color-accent-glow);
+        transform: translateY(-1px);
+      }
+
+      /* ============================================================
+     RESPONSIVE
+     ============================================================ */
+      @media (max-width: 1200px) {
+        .main-panes { grid-template-columns: 280px 1fr; gap: 16px; }
+        :root { --sidebar-width: 196px; }
+      }
+
+      @media (max-width: 900px) {
+        .sidebar { position: relative; top: 0; height: auto; width: 100%; border-right: none; border-bottom: 1px solid var(--color-border-subtle); }
+        .app-shell { flex-direction: column; }
+        .sidebar-nav { display: flex; flex-direction: row; padding: 0; }
+        .sidebar-item { padding: 10px 16px; }
+        .sidebar-item.active::before { top: auto; bottom: 0; left: 8px; right: 8px; width: auto; height: 2px; }
+        .main-panes { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Caption strip -->
+    <div class="caption-strip">
+      FreeSim — Gear / Top Gear — Editorial Noir (static mockup)
+    </div>
+
+    <!-- App shell: sidebar + main -->
+    <div class="app-shell">
+
+      <!-- ============================================================
+       LEFT SIDEBAR
+       ============================================================ -->
+      <aside class="sidebar" aria-label="Main navigation">
+
+        <!-- Brand -->
+        <a class="sidebar-brand" href="#" aria-label="FreeSim home">
+          <!-- Convergence mark: three arcs collapsing to a gold dot -->
+          <span class="sidebar-mark">
+            <svg width="28" height="28" viewBox="0 0 38 38" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <!-- Outermost arc -->
+              <path d="M 6 19 A 13 13 0 0 1 19 6" stroke="#c9a24e" stroke-width="0.9" stroke-linecap="round" opacity="0.35"/>
+              <path d="M 32 19 A 13 13 0 0 1 19 32" stroke="#c9a24e" stroke-width="0.9" stroke-linecap="round" opacity="0.35"/>
+              <!-- Mid arc -->
+              <path d="M 9.5 19 A 9.5 9.5 0 0 1 19 9.5" stroke="#c9a24e" stroke-width="0.9" stroke-linecap="round" opacity="0.6"/>
+              <path d="M 28.5 19 A 9.5 9.5 0 0 1 19 28.5" stroke="#c9a24e" stroke-width="0.9" stroke-linecap="round" opacity="0.6"/>
+              <!-- Inner arc -->
+              <path d="M 13 19 A 6 6 0 0 1 19 13" stroke="#c9a24e" stroke-width="0.9" stroke-linecap="round" opacity="0.85"/>
+              <path d="M 25 19 A 6 6 0 0 1 19 25" stroke="#c9a24e" stroke-width="0.9" stroke-linecap="round" opacity="0.85"/>
+              <!-- Convergence dot -->
+              <circle cx="19" cy="19" r="2.2" fill="#c9a24e"/>
+            </svg>
+          </span>
+          <!-- Wordmark: Space Grotesk, 500, tight tracking; gold diamond on i -->
+          <span class="sidebar-wordmark" aria-label="FreeSim">
+            Free<span class="wm-i-wrap">S<span style="display:inline-block;position:relative;">&#105;<span class="wm-i-dot" aria-hidden="true"></span></span></span>m
+          </span>
+        </a>
+
+        <!-- Nav items -->
+        <nav class="sidebar-nav">
+          <a class="sidebar-item" href="#" style="text-decoration:none;">
+            <!-- Quick Sim: lightning / sparkle icon -->
+            <svg class="sidebar-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9 2L4 9h4l-1 5 5-7H8l1-5z"/>
+            </svg>
+            <span class="sidebar-item-label">Quick Sim</span>
+          </a>
+          <a class="sidebar-item active" href="#" style="text-decoration:none;" aria-current="page">
+            <!-- Gear: armour/chest icon -->
+            <svg class="sidebar-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="2" y="5" width="12" height="8" rx="1"/>
+              <path d="M5 5V4a3 3 0 0 1 6 0v1"/>
+            </svg>
+            <span class="sidebar-item-label">Gear</span>
+          </a>
+          <a class="sidebar-item" href="#" style="text-decoration:none;">
+            <!-- Droptimizer: falling drop / loot icon -->
+            <svg class="sidebar-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="8" cy="9" r="4"/>
+              <path d="M8 2v3M8 5c0 0 2-1.5 2-1"/>
+              <path d="M5.5 6.5L8 5l2.5 1.5"/>
+            </svg>
+            <span class="sidebar-item-label">Droptimizer</span>
+          </a>
+          <a class="sidebar-item" href="#" style="text-decoration:none;">
+            <!-- History: list lines icon -->
+            <svg class="sidebar-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M2 4h12M2 8h8M2 12h5"/>
+            </svg>
+            <span class="sidebar-item-label">History</span>
+          </a>
+        </nav>
+
+        <!-- Sidebar footer: engine status + settings -->
+        <div class="sidebar-footer">
+          <div class="engine-chip">
+            <span class="engine-dot" aria-hidden="true"></span>
+            8 cores · isolated
+          </div>
+          <button class="settings-btn" aria-label="Settings">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="8" cy="8" r="2.5"/>
+              <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41"/>
+            </svg>
+          </button>
+        </div>
+      </aside>
+
+      <!-- ============================================================
+       MAIN CONTENT
+       ============================================================ -->
+      <div class="main-content">
+
+        <!-- In-content header strip -->
+        <div class="content-header">
+          <!-- Left: section title + sub-tabs -->
+          <div class="header-left">
+            <span class="header-title">Gear</span>
+            <nav class="header-subtabs" aria-label="Gear sub-sections">
+              <a class="header-subtab" href="#" style="text-decoration:none;">Equipped</a>
+              <a class="header-subtab active" href="#" style="text-decoration:none;" aria-current="page">Top Gear</a>
+            </nav>
+          </div>
+
+          <!-- Right: sim setting chips -->
+          <div class="header-right" aria-label="Sim settings">
+            <div class="sim-chip">
+              <span class="sim-chip-key">Fight</span>
+              <span class="sim-chip-val">Patchwerk</span>
+            </div>
+            <div class="sim-chip-sep" aria-hidden="true"></div>
+            <div class="sim-chip">
+              <span class="sim-chip-key">Targets</span>
+              <span class="sim-chip-val">1</span>
+            </div>
+            <div class="sim-chip-sep" aria-hidden="true"></div>
+            <div class="sim-chip">
+              <span class="sim-chip-key">Length</span>
+              <span class="sim-chip-val">300s</span>
+            </div>
+            <div class="sim-chip-sep" aria-hidden="true"></div>
+            <div class="sim-chip">
+              <span class="sim-chip-key">Precision</span>
+              <span class="sim-chip-val">High</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Page content -->
+        <main class="page">
+
+          <!-- Character context bar -->
+          <div class="char-context">
+            <div class="char-name-block">
+              <span class="char-name">Aelynn</span>
+              <span class="char-sep">·</span>
+              <span class="char-spec">Retribution Paladin</span>
+              <span class="char-sep">·</span>
+              <span class="char-ilvl num">Item Level 639</span>
+            </div>
+            <div class="char-context-actions">
+              <div class="equipped-chip">
+                Equipped:&nbsp;<strong>1,024,847</strong>&nbsp;DPS
+              </div>
+              <button class="btn-run-topgear">Run Top Gear</button>
+            </div>
+          </div>
+
+          <!-- Two-pane layout -->
+          <div class="main-panes">
+
+            <!-- ========================================================
+             LEFT — Equipped gear (WoW two-column cell layout)
+             ======================================================== -->
+            <div class="equipped-panel">
+              <div class="panel-header">
+                <span class="panel-title">Equipped</span>
+                <span class="panel-ilvl num">639 avg ilvl</span>
+              </div>
+
+              <!-- Main 8×2 grid (top 8 slots + bottom 8) -->
+              <div class="slots-grid">
+
+                <!-- HEAD — SELECTED -->
+                <div class="slot-tile quality-epic selected tooltip-anchor" tabindex="0" aria-label="Head slot, selected">
+                  <div class="slot-icon quality-epic">
+                    <img src="https://wow.zamimg.com/images/wow/icons/large/inv_helmet_25.jpg" alt="Crown of the Dawnbreaker icon"
+                         onerror="this.onerror=null;this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg'"/>
+                    <span class="slot-ilvl-badge num">639</span>
+                  </div>
+                  <div class="slot-info">
+                    <div class="slot-label">Head</div>
+                    <div class="slot-name">Crown of the Dawnbreaker</div>
+                  </div>
+                  <!-- Tooltip -->
+                  <div class="wow-tooltip">
+                    <div class="wow-tooltip-inner quality-epic">
+                      <div class="tt-name quality-epic">Crown of the Dawnbreaker</div>
+                      <div class="tt-ilvl">Item Level 639</div>
+                      <div class="tt-upgrade">Upgrade Level: Hero 4/6</div>
+                      <div class="tt-white">Soulbound</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-row"><span>Head</span><span>Plate</span></div>
+                      <div class="tt-white">7,890 Armor</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-stat">+1,742 Strength</div>
+                      <div class="tt-stat">+2,810 Stamina</div>
+                      <div class="tt-stat">+1,104 Haste</div>
+                      <div class="tt-stat">+878 Crit</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-gem">
+                        <svg viewBox="0 0 10 10" fill="currentColor"><polygon points="5,1 9,5 5,9 1,5"/></svg>
+                        Tiered Medallion Setting +164 Haste
+                      </div>
+                      <div class="tt-green">Enchanted: +180 Haste</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-dur">Durability 100 / 100</div>
+                      <div class="tt-req">Requires Level 80</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-flavor">"Light guide the path where shadow would obscure."</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- NECK -->
+                <div class="slot-tile quality-epic" tabindex="0">
+                  <div class="slot-icon quality-epic">
+                    <img src="https://wow.zamimg.com/images/wow/icons/large/inv_jewelry_necklace_07.jpg" alt="Neck icon"
+                         onerror="this.onerror=null;this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg'"/>
+                    <span class="slot-ilvl-badge num">642</span>
+                  </div>
+                  <div class="slot-info">
+                    <div class="slot-label">Neck</div>
+                    <div class="slot-name">Amulet of Earthen Craft.</div>
+                  </div>
+                  <div class="wow-tooltip">
+                    <div class="wow-tooltip-inner quality-epic">
+                      <div class="tt-name quality-epic">Amulet of Earthen Craftsmanship</div>
+                      <div class="tt-ilvl">Item Level 642</div>
+                      <div class="tt-white">Soulbound · Unique-Equipped</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-row"><span>Neck</span><span></span></div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-stat">+1,180 Strength</div>
+                      <div class="tt-stat">+1,950 Stamina</div>
+                      <div class="tt-stat">+744 Mastery</div>
+                      <div class="tt-stat">+621 Versatility</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-green">Enchanted: +200 Versatility</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-req">Requires Level 80</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-flavor">"Shaped from stone older than the world itself."</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- SHOULDER -->
+                <div class="slot-tile quality-epic" tabindex="0">
+                  <div class="slot-icon quality-epic">
+                    <img src="https://wow.zamimg.com/images/wow/icons/large/inv_shoulder_25.jpg" alt="Shoulder icon"
+                         onerror="this.onerror=null;this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg'"/>
+                    <span class="slot-ilvl-badge num">636</span>
+                  </div>
+                  <div class="slot-info">
+                    <div class="slot-label">Shoulder</div>
+                    <div class="slot-name">Pauldrons of the Vow</div>
+                  </div>
+                </div>
+
+                <!-- BACK -->
+                <div class="slot-tile quality-epic" tabindex="0">
+                  <div class="slot-icon quality-epic">
+                    <img src="https://wow.zamimg.com/images/wow/icons/large/inv_misc_cape_19.jpg" alt="Back icon"
+                         onerror="this.onerror=null;this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg'"/>
+                    <span class="slot-ilvl-badge num">639</span>
+                  </div>
+                  <div class="slot-info">
+                    <div class="slot-label">Back</div>
+                    <div class="slot-name">Consecrated Drape</div>
+                  </div>
+                </div>
+
+                <!-- CHEST — pinned tooltip -->
+                <div class="slot-tile quality-epic tooltip-pinned" tabindex="0">
+                  <div class="slot-icon quality-epic">
+                    <img src="https://wow.zamimg.com/images/wow/icons/large/inv_chest_plate06.jpg" alt="Chest icon"
+                         onerror="this.onerror=null;this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg'"/>
+                    <span class="slot-ilvl-badge num">645</span>
+                  </div>
+                  <div class="slot-info">
+                    <div class="slot-label">Chest</div>
+                    <div class="slot-name">Breastplate of Avenging Lt.</div>
+                  </div>
+                  <div class="wow-tooltip" style="opacity:1;">
+                    <div class="wow-tooltip-inner quality-epic">
+                      <div class="tt-name quality-epic">Breastplate of Avenging Light</div>
+                      <div class="tt-ilvl">Item Level 645</div>
+                      <div class="tt-upgrade">Upgrade Level: Champion 6/6</div>
+                      <div class="tt-white">Soulbound</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-row"><span>Chest</span><span>Plate</span></div>
+                      <div class="tt-white">8,540 Armor</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-stat">+1,894 Strength</div>
+                      <div class="tt-stat">+3,021 Stamina</div>
+                      <div class="tt-stat">+1,247 Haste</div>
+                      <div class="tt-stat">+982 Mastery</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-gem">
+                        <svg viewBox="0 0 10 10" fill="currentColor"><polygon points="5,1 9,5 5,9 1,5"/></svg>
+                        Tiered Medallion Setting +176 Haste
+                      </div>
+                      <div class="tt-green">Enchanted: +200 Mastery</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-green">Equip: Surrounding yourself in righteous flame grants 1,280 Strength for 8 sec.</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-dur">Durability 120 / 120</div>
+                      <div class="tt-req">Requires Level 80</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-flavor">"Forged in the light of the first dawn."</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- WRIST -->
+                <div class="slot-tile quality-epic" tabindex="0">
+                  <div class="slot-icon quality-epic">
+                    <img src="https://wow.zamimg.com/images/wow/icons/large/inv_bracer_07.jpg" alt="Wrist icon"
+                         onerror="this.onerror=null;this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg'"/>
+                    <span class="slot-ilvl-badge num">639</span>
+                  </div>
+                  <div class="slot-info">
+                    <div class="slot-label">Wrist</div>
+                    <div class="slot-name">Bracers of Dawning Hope</div>
+                  </div>
+                </div>
+
+                <!-- HANDS -->
+                <div class="slot-tile quality-epic" tabindex="0">
+                  <div class="slot-icon quality-epic">
+                    <img src="https://wow.zamimg.com/images/wow/icons/large/inv_gauntlets_25.jpg" alt="Hands icon"
+                         onerror="this.onerror=null;this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg'"/>
+                    <span class="slot-ilvl-badge num">639</span>
+                  </div>
+                  <div class="slot-info">
+                    <div class="slot-label">Hands</div>
+                    <div class="slot-name">Gauntlets of Holy Wrath</div>
+                  </div>
+                </div>
+
+                <!-- WAIST -->
+                <div class="slot-tile quality-epic" tabindex="0">
+                  <div class="slot-icon quality-epic">
+                    <img src="https://wow.zamimg.com/images/wow/icons/large/inv_belt_15.jpg" alt="Waist icon"
+                         onerror="this.onerror=null;this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg'"/>
+                    <span class="slot-ilvl-badge num">636</span>
+                  </div>
+                  <div class="slot-info">
+                    <div class="slot-label">Waist</div>
+                    <div class="slot-name">Girdle of the Templar</div>
+                  </div>
+                </div>
+
+                <!-- LEGS -->
+                <div class="slot-tile quality-epic" tabindex="0">
+                  <div class="slot-icon quality-epic">
+                    <img src="https://wow.zamimg.com/images/wow/icons/large/inv_pants_plate_17.jpg" alt="Legs icon"
+                         onerror="this.onerror=null;this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg'"/>
+                    <span class="slot-ilvl-badge num">642</span>
+                  </div>
+                  <div class="slot-info">
+                    <div class="slot-label">Legs</div>
+                    <div class="slot-name">Legguards of Radiant Jdg.</div>
+                  </div>
+                </div>
+
+                <!-- FEET -->
+                <div class="slot-tile quality-epic" tabindex="0">
+                  <div class="slot-icon quality-epic">
+                    <img src="https://wow.zamimg.com/images/wow/icons/large/inv_boots_plate_04.jpg" alt="Feet icon"
+                         onerror="this.onerror=null;this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg'"/>
+                    <span class="slot-ilvl-badge num">639</span>
+                  </div>
+                  <div class="slot-info">
+                    <div class="slot-label">Feet</div>
+                    <div class="slot-name">Sabatons of the Crusade</div>
+                  </div>
+                </div>
+
+                <!-- RING 1 -->
+                <div class="slot-tile quality-epic" tabindex="0">
+                  <div class="slot-icon quality-epic">
+                    <img src="https://wow.zamimg.com/images/wow/icons/large/inv_jewelry_ring_03.jpg" alt="Ring 1 icon"
+                         onerror="this.onerror=null;this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg'"/>
+                    <span class="slot-ilvl-badge num">643</span>
+                  </div>
+                  <div class="slot-info">
+                    <div class="slot-label">Ring 1</div>
+                    <div class="slot-name">Band of the Silver Hand</div>
+                  </div>
+                </div>
+
+                <!-- RING 2 -->
+                <div class="slot-tile quality-epic" tabindex="0">
+                  <div class="slot-icon quality-epic">
+                    <img src="https://wow.zamimg.com/images/wow/icons/large/inv_jewelry_ring_05.jpg" alt="Ring 2 icon"
+                         onerror="this.onerror=null;this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg'"/>
+                    <span class="slot-ilvl-badge num">639</span>
+                  </div>
+                  <div class="slot-info">
+                    <div class="slot-label">Ring 2</div>
+                    <div class="slot-name">Seal of the Naaru</div>
+                  </div>
+                </div>
+
+                <!-- TRINKET 1 -->
+                <div class="slot-tile quality-epic" tabindex="0">
+                  <div class="slot-icon quality-epic">
+                    <img src="https://wow.zamimg.com/images/wow/icons/large/inv_trinket_naxxramas03.jpg" alt="Trinket 1 icon"
+                         onerror="this.onerror=null;this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg'"/>
+                    <span class="slot-ilvl-badge num">639</span>
+                  </div>
+                  <div class="slot-info">
+                    <div class="slot-label">Trinket 1</div>
+                    <div class="slot-name">Reckoner's Insignia</div>
+                  </div>
+                </div>
+
+                <!-- TRINKET 2 — LEGENDARY -->
+                <div class="slot-tile quality-legendary" tabindex="0">
+                  <div class="slot-icon quality-legendary">
+                    <img src="https://wow.zamimg.com/images/wow/icons/large/inv_trinket_naxxramas06.jpg" alt="Trinket 2 icon"
+                         onerror="this.onerror=null;this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg'"/>
+                    <span class="slot-ilvl-badge num" style="color:var(--_p-legendary);">658</span>
+                  </div>
+                  <div class="slot-info">
+                    <div class="slot-label">Trinket 2</div>
+                    <div class="slot-name">Naaru's Reckoning</div>
+                  </div>
+                  <div class="wow-tooltip">
+                    <div class="wow-tooltip-inner quality-legendary">
+                      <div class="tt-name quality-legendary">Naaru's Reckoning</div>
+                      <div class="tt-ilvl">Item Level 658</div>
+                      <div class="tt-white" style="color:#ff8000;">Legendary</div>
+                      <div class="tt-white">Soulbound · Unique-Equipped</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-row"><span>Trinket</span><span></span></div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-stat">+3,640 Strength</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-green">Use: Unleash the Naaru's light, granting 5,210 Strength for 20 sec. (1 Min Cooldown)</div>
+                      <div class="tt-green">Equip: Your Holy Power spenders have a 15% chance to call down a beam of Naaru light, dealing Holy damage equal to 280% of your attack power.</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-req">Requires Level 80</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-flavor">"A fragment of the infinite light, given form."</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- /slots-grid -->
+
+              <!-- Weapons row -->
+              <div class="slots-weapons">
+                <!-- MAIN HAND -->
+                <div class="slot-tile quality-epic" tabindex="0">
+                  <div class="slot-icon quality-epic">
+                    <img src="https://wow.zamimg.com/images/wow/icons/large/inv_sword_27.jpg" alt="Main Hand icon"
+                         onerror="this.onerror=null;this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg'"/>
+                    <span class="slot-ilvl-badge num">645</span>
+                  </div>
+                  <div class="slot-info">
+                    <div class="slot-label">Main Hand · Two-Hand</div>
+                    <div class="slot-name">Vindicator's Greatsword</div>
+                  </div>
+                  <div class="wow-tooltip" style="left:50%;right:auto;top:auto;bottom:calc(100% + 10px);transform:translateX(-50%);">
+                    <div class="wow-tooltip-inner quality-epic">
+                      <div class="tt-name quality-epic">Vindicator's Greatsword</div>
+                      <div class="tt-ilvl">Item Level 645</div>
+                      <div class="tt-upgrade">Upgrade Level: Champion 6/6</div>
+                      <div class="tt-white">Soulbound</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-row"><span>Two-Hand</span><span>Sword</span></div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-dps-row">
+                        <span class="tt-damage">8,142 – 12,214 Damage</span>
+                        <span class="tt-gray">(3.60 speed)</span>
+                      </div>
+                      <div class="tt-dps">2,826 Damage Per Second</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-stat">+2,480 Strength</div>
+                      <div class="tt-stat">+3,840 Stamina</div>
+                      <div class="tt-stat">+1,480 Haste</div>
+                      <div class="tt-stat">+1,240 Crit</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-gem">
+                        <svg viewBox="0 0 10 10" fill="currentColor"><polygon points="5,1 9,5 5,9 1,5"/></svg>
+                        Tiered Medallion Setting +176 Strength
+                      </div>
+                      <div class="tt-green">Enchanted: Spellblade — +400 Strength</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-green">Equip: Your attacks have a chance to call down the Light's judgment, dealing 18,400 Holy damage.</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-dur">Durability 120 / 120</div>
+                      <div class="tt-req">Requires Level 80</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-flavor">"Delivered by the hand of the Vindicator, tempered in Draenic light."</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- OFF HAND — EMPTY (Ret Pally, 2H) -->
+                <div class="slot-tile quality-empty">
+                  <div class="slot-icon" style="border-color:var(--color-border-subtle);background:var(--color-surface-2);">
+                    <img src="https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg" alt="Empty slot"
+                         style="opacity:0.2;" onerror="this.onerror=null;"/>
+                  </div>
+                  <div class="slot-info">
+                    <div class="slot-label">Off Hand</div>
+                    <div class="slot-name">— empty —</div>
+                  </div>
+                </div>
+              </div>
+              <!-- /slots-weapons -->
+            </div>
+            <!-- /equipped-panel -->
+
+            <!-- ========================================================
+             RIGHT — Top Gear picker for Head slot
+             ======================================================== -->
+            <div class="topgear-panel">
+              <div class="topgear-header">
+                <div class="topgear-title">
+                  Head <span>—</span> 6 options
+                </div>
+                <div class="topgear-subtitle">Select items to compare, then run.</div>
+              </div>
+
+              <div class="candidates-list">
+
+                <!-- ── ROW 1: Crown of the Dawnbreaker (Equipped, baseline) ── -->
+                <div class="candidate-row equipped-row">
+                  <input type="checkbox" class="cand-check" checked aria-label="Include Crown of the Dawnbreaker"/>
+                  <div class="cand-icon quality-epic">
+                    <img src="https://wow.zamimg.com/images/wow/icons/large/inv_helmet_25.jpg" alt="Crown of the Dawnbreaker"
+                         onerror="this.onerror=null;this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg'"/>
+                  </div>
+                  <div class="cand-info">
+                    <div class="cand-name-row">
+                      <span class="cand-name quality-epic">Crown of the Dawnbreaker</span>
+                      <span class="cand-ilvl num">639</span>
+                      <span class="badge badge-equipped">Equipped</span>
+                    </div>
+                    <div class="cand-meta-row">
+                      <span class="cand-source">Nerub-ar Palace · Ulgrax</span>
+                      <span class="stat-tag">Haste</span>
+                      <span class="stat-tag">Crit</span>
+                    </div>
+                  </div>
+                  <div class="cand-dps-col">
+                    <span class="cand-dps num">1,024,847</span>
+                    <span class="cand-delta delta-neutral">± 0 baseline</span>
+                    <div class="cand-bar-wrap">
+                      <div class="cand-bar" style="width:88%;background:rgba(163,53,238,0.5);"></div>
+                    </div>
+                  </div>
+                  <!-- Tooltip -->
+                  <div class="wow-tooltip">
+                    <div class="wow-tooltip-inner quality-epic">
+                      <div class="tt-name quality-epic">Crown of the Dawnbreaker</div>
+                      <div class="tt-ilvl">Item Level 639</div>
+                      <div class="tt-upgrade">Upgrade Level: Hero 4/6</div>
+                      <div class="tt-white">Soulbound</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-row"><span>Head</span><span>Plate</span></div>
+                      <div class="tt-white">7,890 Armor</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-stat">+1,742 Strength</div>
+                      <div class="tt-stat">+2,810 Stamina</div>
+                      <div class="tt-stat">+1,104 Haste</div>
+                      <div class="tt-stat">+878 Crit</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-gem">
+                        <svg viewBox="0 0 10 10" fill="currentColor"><polygon points="5,1 9,5 5,9 1,5"/></svg>
+                        Tiered Medallion Setting +164 Haste
+                      </div>
+                      <div class="tt-green">Enchanted: +180 Haste</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-dur">Durability 100 / 100</div>
+                      <div class="tt-req">Requires Level 80</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-flavor">"Light guide the path where shadow would obscure."</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ── ROW 2: Cowl of the Mereldar (WINNER) ── -->
+                <div class="candidate-row winner">
+                  <input type="checkbox" class="cand-check" checked aria-label="Include Cowl of the Mereldar"/>
+                  <div class="cand-icon quality-epic">
+                    <img src="https://wow.zamimg.com/images/wow/icons/large/inv_helmet_44.jpg" alt="Cowl of the Mereldar"
+                         onerror="this.onerror=null;this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg'"/>
+                  </div>
+                  <div class="cand-info">
+                    <div class="cand-name-row">
+                      <span class="cand-name quality-epic">Cowl of the Mereldar</span>
+                      <span class="cand-ilvl num">645</span>
+                      <span class="badge badge-winner">Winner</span>
+                    </div>
+                    <div class="cand-meta-row">
+                      <span class="cand-source">Crafted (Profession)</span>
+                      <span class="stat-tag">Haste</span>
+                      <span class="stat-tag">Mastery</span>
+                    </div>
+                  </div>
+                  <div class="cand-dps-col">
+                    <span class="cand-dps num">1,029,249</span>
+                    <span class="cand-delta delta-pos">+4,402</span>
+                    <div class="cand-bar-wrap">
+                      <div class="cand-bar" style="width:100%;"></div>
+                    </div>
+                  </div>
+                  <!-- Tooltip -->
+                  <div class="wow-tooltip">
+                    <div class="wow-tooltip-inner quality-epic">
+                      <div class="tt-name quality-epic">Cowl of the Mereldar</div>
+                      <div class="tt-ilvl">Item Level 645</div>
+                      <div class="tt-white">Crafted · Soulbound</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-row"><span>Head</span><span>Plate</span></div>
+                      <div class="tt-white">8,120 Armor</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-stat">+1,820 Strength</div>
+                      <div class="tt-stat">+2,940 Stamina</div>
+                      <div class="tt-stat">+1,180 Haste</div>
+                      <div class="tt-stat">+940 Mastery</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-gem">
+                        <svg viewBox="0 0 10 10" fill="currentColor"><polygon points="5,1 9,5 5,9 1,5"/></svg>
+                        Tiered Medallion Setting +176 Haste
+                      </div>
+                      <div class="tt-green">Enchanted: +180 Haste</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-dur">Durability 100 / 100</div>
+                      <div class="tt-req">Requires Level 80</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ── ROW 3: Heronarc's Crown of Torment ── -->
+                <div class="candidate-row">
+                  <input type="checkbox" class="cand-check" checked aria-label="Include Heronarc's Crown of Torment"/>
+                  <div class="cand-icon quality-epic">
+                    <img src="https://wow.zamimg.com/images/wow/icons/large/inv_helmet_50.jpg" alt="Heronarc's Crown of Torment"
+                         onerror="this.onerror=null;this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg'"/>
+                  </div>
+                  <div class="cand-info">
+                    <div class="cand-name-row">
+                      <span class="cand-name quality-epic">Heronarc's Crown of Torment</span>
+                      <span class="cand-ilvl num">642</span>
+                    </div>
+                    <div class="cand-meta-row">
+                      <span class="cand-source">Nerub-ar Palace · Silken Court</span>
+                      <span class="stat-tag">Crit</span>
+                      <span class="stat-tag">Haste</span>
+                    </div>
+                  </div>
+                  <div class="cand-dps-col">
+                    <span class="cand-dps num">1,028,057</span>
+                    <span class="cand-delta delta-pos">+3,210</span>
+                    <div class="cand-bar-wrap">
+                      <div class="cand-bar delta-pos-bar" style="width:92%;"></div>
+                    </div>
+                  </div>
+                  <div class="wow-tooltip">
+                    <div class="wow-tooltip-inner quality-epic">
+                      <div class="tt-name quality-epic">Heronarc's Crown of Torment</div>
+                      <div class="tt-ilvl">Item Level 642</div>
+                      <div class="tt-white">Soulbound</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-row"><span>Head</span><span>Plate</span></div>
+                      <div class="tt-white">8,010 Armor</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-stat">+1,780 Strength</div>
+                      <div class="tt-stat">+2,870 Stamina</div>
+                      <div class="tt-stat">+1,062 Crit</div>
+                      <div class="tt-stat">+910 Haste</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-req">Requires Level 80</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-flavor">"The Silken Court weaves suffering into steel."</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ── ROW 4: Living Luster's Diadem ── -->
+                <div class="candidate-row">
+                  <input type="checkbox" class="cand-check" checked aria-label="Include Living Luster's Diadem"/>
+                  <div class="cand-icon quality-epic">
+                    <img src="https://wow.zamimg.com/images/wow/icons/large/inv_helmet_24.jpg" alt="Living Luster's Diadem"
+                         onerror="this.onerror=null;this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg'"/>
+                  </div>
+                  <div class="cand-info">
+                    <div class="cand-name-row">
+                      <span class="cand-name quality-epic">Living Luster's Diadem</span>
+                      <span class="cand-ilvl num">636</span>
+                    </div>
+                    <div class="cand-meta-row">
+                      <span class="cand-source">Mythic+ · The Vault</span>
+                      <span class="stat-tag">Haste</span>
+                      <span class="stat-tag">Versatility</span>
+                    </div>
+                  </div>
+                  <div class="cand-dps-col">
+                    <span class="cand-dps num">1,026,027</span>
+                    <span class="cand-delta delta-pos">+1,180</span>
+                    <div class="cand-bar-wrap">
+                      <div class="cand-bar delta-pos-bar" style="width:72%;"></div>
+                    </div>
+                  </div>
+                  <div class="wow-tooltip">
+                    <div class="wow-tooltip-inner quality-epic">
+                      <div class="tt-name quality-epic">Living Luster's Diadem</div>
+                      <div class="tt-ilvl">Item Level 636</div>
+                      <div class="tt-white">Soulbound</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-row"><span>Head</span><span>Plate</span></div>
+                      <div class="tt-white">7,640 Armor</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-stat">+1,620 Strength</div>
+                      <div class="tt-stat">+2,680 Stamina</div>
+                      <div class="tt-stat">+1,010 Haste</div>
+                      <div class="tt-stat">+820 Versatility</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-req">Requires Level 80</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ── ROW 5: Halqi's Draconic Hexgrasp (unchecked) ── -->
+                <div class="candidate-row unchecked">
+                  <input type="checkbox" class="cand-check" aria-label="Include Halqi's Draconic Hexgrasp"/>
+                  <div class="cand-icon quality-epic">
+                    <img src="https://wow.zamimg.com/images/wow/icons/large/inv_helmet_56.jpg" alt="Halqi's Draconic Hexgrasp"
+                         onerror="this.onerror=null;this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg'"/>
+                  </div>
+                  <div class="cand-info">
+                    <div class="cand-name-row">
+                      <span class="cand-name quality-epic">Halqi's Draconic Hexgrasp</span>
+                      <span class="cand-ilvl num">632</span>
+                    </div>
+                    <div class="cand-meta-row">
+                      <span class="cand-source">Nerub-ar Palace · Rasha'nan</span>
+                      <span class="stat-tag">Mastery</span>
+                      <span class="stat-tag">Crit</span>
+                    </div>
+                  </div>
+                  <div class="cand-dps-col">
+                    <span class="cand-dps num">1,023,987</span>
+                    <span class="cand-delta delta-neg">−860</span>
+                    <div class="cand-bar-wrap">
+                      <div class="cand-bar delta-neg-bar" style="width:62%;"></div>
+                    </div>
+                  </div>
+                  <div class="wow-tooltip">
+                    <div class="wow-tooltip-inner quality-epic">
+                      <div class="tt-name quality-epic">Halqi's Draconic Hexgrasp</div>
+                      <div class="tt-ilvl">Item Level 632</div>
+                      <div class="tt-white">Soulbound</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-row"><span>Head</span><span>Plate</span></div>
+                      <div class="tt-white">7,320 Armor</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-stat">+1,560 Strength</div>
+                      <div class="tt-stat">+2,580 Stamina</div>
+                      <div class="tt-stat">+962 Mastery</div>
+                      <div class="tt-stat">+790 Crit</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-req">Requires Level 80</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ── ROW 6: Forgehand's Helm (Rare, unchecked) ── -->
+                <div class="candidate-row unchecked">
+                  <input type="checkbox" class="cand-check" aria-label="Include Forgehand's Helm"/>
+                  <div class="cand-icon quality-rare">
+                    <img src="https://wow.zamimg.com/images/wow/icons/large/inv_helmet_30.jpg" alt="Forgehand's Helm"
+                         onerror="this.onerror=null;this.src='https://wow.zamimg.com/images/wow/icons/large/inv_misc_questionmark.jpg'"/>
+                  </div>
+                  <div class="cand-info">
+                    <div class="cand-name-row">
+                      <span class="cand-name quality-rare">Forgehand's Helm</span>
+                      <span class="cand-ilvl num">619</span>
+                    </div>
+                    <div class="cand-meta-row">
+                      <span class="cand-source">Mythic+</span>
+                      <span class="stat-tag">Crit</span>
+                      <span class="stat-tag">Haste</span>
+                    </div>
+                  </div>
+                  <div class="cand-dps-col">
+                    <span class="cand-dps num">1,019,307</span>
+                    <span class="cand-delta delta-neg">−5,540</span>
+                    <div class="cand-bar-wrap">
+                      <div class="cand-bar delta-neg-bar" style="width:35%;"></div>
+                    </div>
+                  </div>
+                  <div class="wow-tooltip">
+                    <div class="wow-tooltip-inner quality-rare">
+                      <div class="tt-name quality-rare">Forgehand's Helm</div>
+                      <div class="tt-ilvl">Item Level 619</div>
+                      <div class="tt-white">Soulbound</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-row"><span>Head</span><span>Plate</span></div>
+                      <div class="tt-white">6,840 Armor</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-stat">+1,340 Strength</div>
+                      <div class="tt-stat">+2,220 Stamina</div>
+                      <div class="tt-stat">+840 Crit</div>
+                      <div class="tt-stat">+680 Haste</div>
+                      <hr class="tt-divider"/>
+                      <div class="tt-req">Requires Level 80</div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+              <!-- /candidates-list -->
+
+              <!-- Footer -->
+              <div class="topgear-footer">
+                <span class="footer-meta"><strong>4</strong> of 6 items selected</span>
+                <button class="btn-run-selected">Run Top Gear (4 selected)</button>
+              </div>
+            </div>
+            <!-- /topgear-panel -->
+
+          </div>
+          <!-- /main-panes -->
+
+        </main>
+      </div>
+      <!-- /main-content -->
+
+    </div>
+    <!-- /app-shell -->
+
+    <!-- ============================================================
+     JS — interactivity: checkbox sync, slot selection, sidebar nav
+     ============================================================ -->
+    <script>
+      (function () {
+        // Sync unchecked class with checkbox state
+        document.querySelectorAll('.cand-check').forEach(function (cb) {
+          var row = cb.closest('.candidate-row');
+          cb.addEventListener('change', function () {
+            if (cb.checked) {
+              row.classList.remove('unchecked');
+            } else {
+              row.classList.add('unchecked');
+            }
+            updateCount();
+          });
+        });
+
+        function updateCount() {
+          var checked = document.querySelectorAll('.cand-check:checked').length;
+          var btn = document.querySelector('.btn-run-selected');
+          var meta = document.querySelector('.footer-meta');
+          var total = document.querySelectorAll('.cand-check').length;
+          if (btn) btn.textContent = 'Run Top Gear (' + checked + ' selected)';
+          if (meta) meta.innerHTML = '<strong>' + checked + '</strong> of ' + total + ' items selected';
+        }
+
+        // Clicking a gear slot tile on the left sets it as selected
+        document.querySelectorAll('.equipped-panel .slot-tile').forEach(function (tile) {
+          if (tile.classList.contains('quality-empty')) return;
+          tile.addEventListener('click', function () {
+            document.querySelectorAll('.equipped-panel .slot-tile').forEach(function (t) {
+              t.classList.remove('selected');
+            });
+            tile.classList.add('selected');
+          });
+        });
+
+        // Sidebar nav item clicks
+        document.querySelectorAll('.sidebar-item').forEach(function (item) {
+          item.addEventListener('click', function (e) {
+            e.preventDefault();
+            document.querySelectorAll('.sidebar-item').forEach(function (i) {
+              i.classList.remove('active');
+              i.removeAttribute('aria-current');
+            });
+            item.classList.add('active');
+            item.setAttribute('aria-current', 'page');
+          });
+        });
+
+        // Header sub-tab clicks
+        document.querySelectorAll('.header-subtab').forEach(function (tab) {
+          tab.addEventListener('click', function (e) {
+            e.preventDefault();
+            document.querySelectorAll('.header-subtab').forEach(function (t) {
+              t.classList.remove('active');
+              t.removeAttribute('aria-current');
+            });
+            tab.classList.add('active');
+            tab.setAttribute('aria-current', 'page');
+          });
+        });
+      })();
+    </script>
+  </body>
+</html>

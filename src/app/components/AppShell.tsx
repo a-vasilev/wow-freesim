@@ -15,8 +15,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <header className="border-border bg-surface-raised border-b">
         <nav className="mx-auto flex max-w-6xl items-center gap-6 px-6 py-4">
-          <span className="text-fg font-mono text-lg font-semibold">
-            wow-freesim
+          <span className="text-fg font-display text-lg font-semibold tracking-tight">
+            FreeSim
           </span>
           <ul className="flex items-center gap-4">
             {NAV_LINKS.map((link) => (
