@@ -1,0 +1,53 @@
+/*
+ * SEMANTIC TOKENS — intent-named, the ONLY tier components reference
+ * (indirectly, via the Tailwind utilities wired up in theme.css).
+ *
+ * A theme is exactly one block below: a remap of semantic -> primitive under a
+ * [data-theme="..."] selector on <html>. Day one ships a single neutral
+ * placeholder theme. Adding/replacing a theme later = add one more block; no
+ * component changes. The :root selector duplicates the default so the tokens
+ * still resolve if the attribute is ever missing (avoids FOUC).
+ *
+ * theme.css binds these `--c-*` / `--sem-*` vars into Tailwind's token
+ * namespaces so they become utilities (bg-surface, text-fg, rounded-md, …).
+ */
+
+:root,
+[data-theme='neutral'] {
+  /* Surfaces */
+  --c-surface: var(--gray-950);
+  --c-surface-raised: var(--gray-900);
+  --c-surface-overlay: var(--gray-800);
+
+  /* Foreground (text) */
+  --c-fg: var(--gray-50);
+  --c-fg-muted: var(--gray-400);
+  --c-fg-subtle: var(--gray-500);
+
+  /* Borders / lines */
+  --c-border: var(--gray-800);
+  --c-border-strong: var(--gray-700);
+
+  /* Accent / interactive */
+  --c-accent: var(--blue-500);
+  --c-accent-hover: var(--blue-400);
+  --c-accent-fg: var(--gray-50);
+
+  /* Status */
+  --c-danger: var(--red-500);
+  --c-danger-fg: var(--gray-50);
+  --c-success: var(--green-500);
+  --c-warning: var(--amber-400);
+
+  /* Focus ring */
+  --c-focus: var(--blue-400);
+
+  /* Data viz */
+  --c-dps: var(--blue-400);
+  --c-chart-1: var(--hue-1);
+  --c-chart-2: var(--hue-2);
+  --c-chart-3: var(--hue-3);
+  --c-chart-4: var(--hue-4);
+  --c-chart-5: var(--hue-5);
+  --c-chart-6: var(--hue-6);
+}

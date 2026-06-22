@@ -1,0 +1,51 @@
+/*
+ * PRIMITIVE TOKENS — the raw palette/scales.
+ *
+ * These are the lowest tier: literal color values, never referenced in markup
+ * and never exposed as Tailwind utilities (they are NOT in @theme). Components
+ * only ever touch the SEMANTIC tokens (see semantic.css), which point here.
+ *
+ * A theme = a remap of semantic -> primitive (semantic.css). Adding a new
+ * palette value here does not, by itself, create any utility class.
+ */
+
+:root {
+  /* ── Neutral / gray ─────────────────────────────────────────────── */
+  --gray-50: oklch(0.985 0 0);
+  --gray-100: oklch(0.967 0 0);
+  --gray-200: oklch(0.922 0 0);
+  --gray-300: oklch(0.87 0 0);
+  --gray-400: oklch(0.708 0 0);
+  --gray-500: oklch(0.556 0 0);
+  --gray-600: oklch(0.439 0 0);
+  --gray-700: oklch(0.371 0 0);
+  --gray-800: oklch(0.269 0 0);
+  --gray-900: oklch(0.205 0 0);
+  --gray-950: oklch(0.145 0 0);
+
+  /* ── Blue (accent family) ───────────────────────────────────────── */
+  --blue-400: oklch(0.707 0.165 254.624);
+  --blue-500: oklch(0.623 0.214 259.815);
+  --blue-600: oklch(0.546 0.245 262.881);
+
+  /* ── Red (danger) ───────────────────────────────────────────────── */
+  --red-400: oklch(0.704 0.191 22.216);
+  --red-500: oklch(0.637 0.237 25.331);
+  --red-600: oklch(0.577 0.245 27.325);
+
+  /* ── Green (success) ────────────────────────────────────────────── */
+  --green-400: oklch(0.792 0.209 151.711);
+  --green-500: oklch(0.723 0.219 149.579);
+
+  /* ── Amber (warning) ────────────────────────────────────────────── */
+  --amber-400: oklch(0.828 0.189 84.429);
+  --amber-500: oklch(0.769 0.188 70.08);
+
+  /* ── Categorical chart hues (data viz, e.g. ability breakdown) ──── */
+  --hue-1: oklch(0.707 0.165 254.624); /* blue   */
+  --hue-2: oklch(0.769 0.188 70.08); /* amber  */
+  --hue-3: oklch(0.723 0.219 149.579); /* green  */
+  --hue-4: oklch(0.637 0.237 25.331); /* red    */
+  --hue-5: oklch(0.627 0.265 303.9); /* purple */
+  --hue-6: oklch(0.745 0.16 232.661); /* cyan   */
+}

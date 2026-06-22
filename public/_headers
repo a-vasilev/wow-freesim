@@ -1,0 +1,6 @@
+# Cloudflare Pages headers.
+# Cross-origin isolation is mandatory for multithreaded WASM (SharedArrayBuffer).
+# Mirrors the Vite dev-server headers in vite.config.ts. See docs/OVERALL_PLAN.md §1.
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp

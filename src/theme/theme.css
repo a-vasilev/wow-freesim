@@ -1,0 +1,101 @@
+/*
+ * THEME ENTRY — the single stylesheet imported by the app (src/main.tsx).
+ *
+ * Tailwind v4 is configured CSS-first here. The @theme block does two jobs:
+ *   1. STRIPS Tailwind's default scales (--color-*, --text-*, --radius-*,
+ *      --shadow-*, --font-* set to `initial`) so off-token classes literally
+ *      do not compile — `text-blue-500` / `rounded-3xl` no longer exist.
+ *   2. REGISTERS our tokens, generating only on-token utilities. Color tokens
+ *      point at the semantic `--c-*` vars (see semantic.css), so swapping the
+ *      [data-theme] attribute re-themes every utility with zero markup changes.
+ *
+ * Spacing is intentionally left on Tailwind's 4px-grid multiplier (`p-4`, etc.)
+ * — on-grid by construction; arbitrary spacing (`p-[13px]`) is blocked by lint.
+ */
+
+@import 'tailwindcss';
+@import './tokens.css';
+@import './semantic.css';
+
+@theme {
+  /* ── Colors: drop the default palette; expose only semantic tokens ── */
+  --color-*: initial;
+
+  --color-surface: var(--c-surface);
+  --color-surface-raised: var(--c-surface-raised);
+  --color-surface-overlay: var(--c-surface-overlay);
+
+  --color-fg: var(--c-fg);
+  --color-fg-muted: var(--c-fg-muted);
+  --color-fg-subtle: var(--c-fg-subtle);
+
+  --color-border: var(--c-border);
+  --color-border-strong: var(--c-border-strong);
+
+  --color-accent: var(--c-accent);
+  --color-accent-hover: var(--c-accent-hover);
+  --color-accent-fg: var(--c-accent-fg);
+
+  --color-danger: var(--c-danger);
+  --color-danger-fg: var(--c-danger-fg);
+  --color-success: var(--c-success);
+  --color-warning: var(--c-warning);
+
+  --color-focus: var(--c-focus);
+
+  --color-dps: var(--c-dps);
+  --color-chart-1: var(--c-chart-1);
+  --color-chart-2: var(--c-chart-2);
+  --color-chart-3: var(--c-chart-3);
+  --color-chart-4: var(--c-chart-4);
+  --color-chart-5: var(--c-chart-5);
+  --color-chart-6: var(--c-chart-6);
+
+  /* ── Typography: drop defaults; expose only our scale ── */
+  --font-*: initial;
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica,
+    Arial, sans-serif;
+  --font-mono:
+    ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas,
+    'DejaVu Sans Mono', monospace;
+
+  --text-*: initial;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 2rem;
+  --text-3xl: 1.875rem;
+  --text-3xl--line-height: 2.25rem;
+
+  /* ── Radius: drop defaults; expose only our scale ── */
+  --radius-*: initial;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-full: 9999px;
+
+  /* ── Shadow: drop defaults; expose only our scale ── */
+  --shadow-*: initial;
+  --shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.3);
+  --shadow-md: 0 4px 8px -2px oklch(0 0 0 / 0.4);
+  --shadow-lg: 0 12px 24px -6px oklch(0 0 0 / 0.5);
+}
+
+@layer base {
+  body {
+    background-color: var(--color-surface);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+}
