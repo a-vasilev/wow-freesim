@@ -107,39 +107,71 @@ async function sha256Hex(buf: ArrayBuffer): Promise<string> {
     .join('')
 }
 
+/** sha256 of the bytes, or null when integrity verification is off (dev). */
+async function wasmHash(bytes: ArrayBuffer): Promise<string | null> {
+  return ENGINE_CONFIG.verifyIntegrity ? await sha256Hex(bytes) : null
+}
+
+/** True if these bytes are the pinned wasm (always true when verification is off). */
+const wasmOk = (hash: string | null): boolean =>
+  !ENGINE_CONFIG.verifyIntegrity || hash === ENGINE_CONFIG.sha256.wasm
+
+/** CORS fetch of the wasm with an explicit HTTP-cache mode; returns bytes + hash.
+ *  CORS is required for the R2 wasm under COEP: credentialless (WEB_UI_PLAN §3.1);
+ *  same-origin in dev. */
+async function fetchWasm(
+  mode: RequestCache,
+): Promise<{ bytes: ArrayBuffer; hash: string | null }> {
+  const res = await fetch(ENGINE_CONFIG.wasmUrl, { mode: 'cors', cache: mode })
+  if (!res.ok)
+    throw new Error(`wasm fetch failed: ${res.status} ${ENGINE_CONFIG.wasmUrl}`)
+  const bytes = await res.arrayBuffer()
+  return { bytes, hash: await wasmHash(bytes) }
+}
+
+// Self-healing load: the wasm is pinned by an immutable versioned URL, so both the
+// Cache API entry and the browser HTTP-cache entry are cached aggressively and never
+// re-validated. That means a single bad copy (a partial/wrong upload fetched during
+// setup, a truncated download) would otherwise brick the engine on EVERY reload until
+// the user manually clears storage. So at each layer we verify and, on mismatch, drop
+// to the next source — Cache API → HTTP cache → network (cache: 'reload' bypasses a
+// poisoned immutable HTTP-cache entry, which a normal fetch/reload won't).
 async function loadWasmBytes(): Promise<ArrayBuffer> {
   if (wasmBytes) return wasmBytes
   const url = ENGINE_CONFIG.wasmUrl
-  // Cache API keyed by the immutable versioned URL, so a patch bump invalidates.
-  let bytes: ArrayBuffer | undefined
-  try {
-    const cache = await caches.open('simc-engine')
+  const cache = await caches.open('simc-engine').catch(() => null)
+
+  // 1. Cache API copy — verify; evict if stale/corrupt.
+  if (cache) {
     const hit = await cache.match(url)
-    if (hit) bytes = await hit.arrayBuffer()
-    else {
-      // Explicit CORS fetch (works same-origin in dev; required for the R2 wasm
-      // under COEP: credentialless in prod — see WEB_UI_PLAN §3.1).
-      const res = await fetch(url, { mode: 'cors' })
-      if (!res.ok) throw new Error(`wasm fetch ${res.status}`)
-      await cache.put(url, res.clone())
-      bytes = await res.arrayBuffer()
-    }
-  } catch {
-    const res = await fetch(url, { mode: 'cors' })
-    if (!res.ok) throw new Error(`wasm fetch failed: ${res.status} ${url}`)
-    bytes = await res.arrayBuffer()
-  }
-  if (ENGINE_CONFIG.verifyIntegrity) {
-    const got = await sha256Hex(bytes)
-    if (got !== ENGINE_CONFIG.sha256.wasm) {
-      throw new Error(
-        `simc.wasm integrity mismatch (got ${got.slice(0, 12)}…, ` +
-          `want ${ENGINE_CONFIG.sha256.wasm.slice(0, 12)}…)`,
-      )
+    if (hit) {
+      const bytes = await hit.arrayBuffer()
+      if (wasmOk(await wasmHash(bytes))) return (wasmBytes = bytes)
+      console.warn('[engine] cached wasm failed integrity — evicting')
+      await cache.delete(url)
     }
   }
-  wasmBytes = bytes
-  return bytes
+
+  // 2. Network: try the HTTP cache first, then force-bypass it on mismatch.
+  let got: string | null = null
+  for (const mode of ['default', 'reload'] as const) {
+    const { bytes, hash } = await fetchWasm(mode)
+    if (wasmOk(hash)) {
+      if (cache)
+        await cache.put(
+          url,
+          new Response(bytes, { headers: { 'Content-Type': 'application/wasm' } }),
+        )
+      return (wasmBytes = bytes)
+    }
+    got = hash
+    console.warn(`[engine] wasm failed integrity (http-cache:${mode}) got ${hash?.slice(0, 12)}…`)
+  }
+
+  throw new Error(
+    `simc.wasm integrity mismatch (got ${got?.slice(0, 12)}…, ` +
+      `want ${ENGINE_CONFIG.sha256.wasm.slice(0, 12)}…)`,
+  )
 }
 
 // ── progress parsing (simc stdout progressbar) ───────────────────────────────
