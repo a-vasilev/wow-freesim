@@ -1,0 +1,24 @@
+/*
+ * Report gradients (DESIGN_SYSTEM §8.10/§8.11). Linear-gradients can't be
+ * expressed as token utilities, so they live here as plain CSS built FROM the
+ * token vars (not raw hexes, except the one fixed accent-fade stop the design
+ * specifies). Keeps the token-discipline lint satisfied.
+ */
+.dps-underline {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    var(--c-accent),
+    rgba(201, 162, 78, 0.3) 60%,
+    transparent
+  );
+}
+
+.ability-bar-fill {
+  background: linear-gradient(90deg, var(--c-accent), var(--c-accent-dim));
+  opacity: 0.65;
+  transition: opacity 0.12s;
+}
+.ability-row:hover .ability-bar-fill {
+  opacity: 0.9;
+}

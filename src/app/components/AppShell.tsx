@@ -1,10 +1,16 @@
 import type { ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
+import { EngineStatusChip } from '@/ui/EngineStatusChip'
 import { CrossOriginIsolationBanner } from './CrossOriginIsolationBanner'
 
 const NAV_LINKS = [
   { to: '/', label: 'Home' },
+  { to: '/quick-sim', label: 'Quick Sim' },
+  { to: '/advanced', label: 'Advanced' },
   { to: '/styleguide', label: 'Styleguide' },
+  ...(import.meta.env.DEV
+    ? ([{ to: '/dev/engine', label: 'Engine' }] as const)
+    : []),
 ] as const
 
 /** Layout shell: isolation banner, top nav, and the routed content region. */
@@ -32,6 +38,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               </li>
             ))}
           </ul>
+          <div className="ml-auto">
+            <EngineStatusChip />
+          </div>
         </nav>
       </header>
 

@@ -1,0 +1,19 @@
+/*
+ * The engine "live readout" dot (DESIGN_SYSTEM §8.15). Its green (#3dd68c) + glow
+ * are deliberately NOT theme tokens — they're a fixed status indicator, identical
+ * across themes. Kept here as plain CSS (not an inline style / arbitrary Tailwind
+ * value) so the token-discipline lint stays satisfied.
+ */
+.engine-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  flex: none;
+  background: #3dd68c;
+  box-shadow: 0 0 6px rgba(61, 214, 140, 0.6);
+}
+
+.engine-dot[data-state='off'] {
+  background: var(--c-warning);
+  box-shadow: none;
+}
