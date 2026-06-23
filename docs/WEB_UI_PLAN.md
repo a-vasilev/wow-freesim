@@ -1,4 +1,4 @@
-# Web UI Implementation Plan (`web` repo) — v0.2
+# Web UI Implementation Plan (`web` repo) — v0.3
 
 Companion to [`OVERALL_PLAN.md`](./OVERALL_PLAN.md). That document settles the
 product, architecture, and engine strategy. This one details **how the web UI is
@@ -9,15 +9,49 @@ The architecture in `OVERALL_PLAN.md` is treated as settled and is **not**
 relitigated here (React + TS + Vite, Comlink-over-Web-Worker to a threaded
 `simc.wasm`, MEMFS/`json2` I/O, Dexie history, Fuse.js search, Cloudflare Pages).
 
-**What changed since v0.1.** Two things landed that this revision folds in:
+**What changed since v0.2 — the engine is real.** The single biggest assumption
+of v0.1/v0.2 was *"the fork isn't ready, so build entirely against a `MockEngine`
+and swap the real `WasmEngine` in last (U5), gated on the fork."* **That gate is
+gone.** The fork now publishes a consumable, threaded/SIMD WebAssembly build as a
+versioned GitHub release — **`simc-wasm` `v1205.01`**
+([release](https://github.com/a-vasilev/simc-wasm/releases/tag/v1205.01)). This
+revision folds that in and **re-sequences the build so the real engine is brought
+up early as a spine**, not bolted on at the end. Details: §3 (artifact contract)
+and §5 (re-sequenced phases).
 
-1. **The design landed — "Editorial Noir".** The visual system is no longer a
-   late-binding placeholder. Tokens, typography, the app shell, and component
-   specs are settled in [`DESIGN_SYSTEM.md`](./DESIGN_SYSTEM.md) + `src/theme/`,
-   with reference mockups in `docs/mockups/` (`gear.html`, `report.html`). New UI
-   is built against those tokens, not ad-hoc styles.
-2. **Phase U0 shipped** (foundation + theming spine). The next milestone is the
-   **Quick Sim** feature, now specified concretely in §6.
+**What the release actually contains** (this is the contract the web app codes
+to — see §3.1):
+
+| Asset | What it is |
+|---|---|
+| `simc.js` (~80 KB) | Emscripten ES6 glue — `import createSimc from './simc.js'`, a `MODULARIZE`/`EXPORT_ES6` default export returning `Promise<Module>` |
+| `simc.wasm` (~107 MB) | the threaded/SIMD binary with baked game data (flags: `-pthread -msimd128 -fwasm-exceptions -O3 -sPROXY_TO_PTHREAD -sMODULARIZE -sEXPORT_ES6`) |
+| `manifest.json` | `release_tag`, `sc_version`, `upstream_base_sha`, `emsdk_version`, `build_flags`, and per-file **sha256** hashes — the pin + integrity record |
+
+**Two consequences that reshape the plan:**
+
+1. **Real engine first, not last.** We can prove the whole client-side sim
+   end-to-end *now* (OVERALL_PLAN's "Phase 0 spine") and finalize the Zod
+   `SimReport`/`ParsedCharacter` schemas against **real `json2`** instead of
+   guessing. `MockEngine` does **not** go away — it stays the fast-iteration /
+   offline implementation behind the same seam — but the high-risk integration
+   (107 MB load, cross-origin-isolated threads, MEMFS I/O, real report shape)
+   moves to the front where it de-risks everything after it.
+2. **The engine-data bundle has *not* shipped yet.** `v1205.01` is the **wasm +
+   glue only** — there is **no `talents.json` / `item-index.json` in it**, even
+   though OVERALL_PLAN §6 describes them as a per-patch byproduct of the same CI.
+   So the talent-tree layout remains on the **§6.5 fallback / sample fixture**
+   until a later release adds those files; nothing in Quick Sim is gated on them
+   (it never was). This corrects the v0.2 wording that said the bundle "ships with
+   the wasm in U5."
+
+**Also still true from v0.2:**
+
+- **The design landed — "Editorial Noir".** Tokens, typography, the app shell,
+  and component specs are settled in [`DESIGN_SYSTEM.md`](./DESIGN_SYSTEM.md) +
+  `src/theme/`, with reference mockups in `docs/mockups/` (`gear.html`,
+  `report.html`). New UI is built against those tokens, not ad-hoc styles.
+- **Phase U0 shipped** (foundation + theming spine).
 
 ---
 
@@ -29,10 +63,13 @@ relitigated here (React + TS + Vite, Comlink-over-Web-Worker to a threaded
    enforced mechanically (lint + a deliberately stripped Tailwind palette), not by
    discipline. Full rationale + enforcement: `DESIGN_SYSTEM.md` §11.
 2. **The engine is behind a seam.** All UI work targets a typed `SimEngine`
-   interface with a **mock implementation**. The real `simc.wasm` is just another
-   implementation of that interface, dropped in later. Nothing in the UI imports
-   wasm directly. This is how we develop in full parallel with the fork **without
-   depending on it yet**.
+   interface. There are now **two real implementations** behind it: `MockEngine`
+   (fast iteration / offline / future tests) and `WasmEngine` (the published
+   `simc-wasm` release). Nothing in the UI imports wasm directly; a factory + env
+   flag picks the implementation, and every component renders identically against
+   either. The seam is no longer a stand-in for an absent engine — it's how the
+   UI stays decoupled from a 107 MB artifact and lets us keep developing UI states
+   (empty/error/invalid) without booting the binary every reload.
 3. **Build against the shipped design.** "Editorial Noir" is the approved look.
    The token system, app shell, and component specs are authoritative; build new
    UI against them. The only screens without a mockup are the Quick Sim **compose**
@@ -93,9 +130,9 @@ any future theme work.
 
 ---
 
-## 3. Engine abstraction (parallel dev, no wasm dependency)
+## 3. Engine abstraction & the real engine artifact
 
-A single typed contract both implementations satisfy:
+A single typed contract every implementation satisfies:
 
 ```ts
 interface SimEngine {
@@ -132,11 +169,75 @@ interface SimEngine {
 - **`MockEngine`** (Phase U1): runs in a worker, returns realistic
   `ParsedCharacter` and `SimReport` payloads shaped from **captured real simc
   `json2` samples**, with `run()` faking progress + cancel over a couple seconds.
-- **`WasmEngine`** (later, U5): same interface, hosts `simc.wasm` via Comlink,
-  MEMFS in / `out.json` out. `inspect()` is a fast parse pass; `run()` is the full
-  sim.
-- A factory + env flag selects the implementation. **Switching to the real engine
-  is a one-line change**; all UI built against the mock keeps working.
+  Stays the default for fast UI loops and offline work even after the real engine
+  lands.
+- **`WasmEngine`** (Phase U2 — now early, no longer last): same interface, hosts
+  the published `simc.js`/`simc.wasm` via Comlink, MEMFS in / `out.json` out.
+  `inspect()` is a fast minimal-iteration parse pass; `run()` is the full sim. See
+  §3.1 for the concrete consumption contract.
+- A factory + env flag selects the implementation. Switching between mock and real
+  is a one-line change; all UI built against either keeps working.
+
+### 3.1 Consuming the engine release (`simc-wasm v1205.01`)
+
+The `WasmEngine` is the only place in the app that touches the artifact. The
+release contract (from the release notes + `manifest.json`):
+
+- **Module shape.** `simc.js` is `MODULARIZE` + `EXPORT_ES6`, so the host worker
+  does `import createSimc from '<engine-url>/simc.js'` → `await createSimc({...})`
+  → a standard Emscripten `Module`. We drive it **CLI-style** (OVERALL_PLAN §5):
+  write the profile to a `.simc` file in **MEMFS**, run `main()` with
+  `json2=out.json` (+ run args), read `out.json` back, `Zod`-parse into
+  `SimReport`. No embind. The host worker is the existing Comlink orchestration
+  worker; the engine spawns its **own pthread pool** beneath it (`PROXY_TO_PTHREAD`
+  → `main()` already runs off the host worker's thread).
+- **The same-origin split (what must be local vs. what can be remote).** Pthreads
+  are Web Workers the glue spawns by re-loading **`simc.js` itself** as an
+  `em-pthread` worker, and worker scripts must be **same-origin** — so **`simc.js`
+  (~80 KB) is vendored into the app and served same-origin** (a normal Pages static
+  asset, well under the 25 MiB limit). The **107 MB `simc.wasm` can be remote**: it
+  is fetched **once, on the host thread**, and Emscripten shares the compiled
+  `WebAssembly.Module` to the pthread workers via `postMessage` — the pthreads
+  **never re-fetch it**. So exactly one cross-origin fetch, on one thread. We point
+  `Module.locateFile` (or a `Module.instantiateWasm` override) at the remote wasm
+  URL; neither file enters the Vite graph (a 107 MB asset must never be bundled).
+- **Hosting the 107 MB binary — R2 custom domain, no Worker (chosen).** It
+  **cannot** be a Cloudflare Pages static file (Pages enforces a **25 MiB per-file
+  limit**) and must not live in git or be bundled. Approach: store the versioned
+  artifact in **R2** and expose the bucket via an **R2 custom domain**
+  (`engine.<domain>/<tag>/simc.wasm`) — no Function/Worker in the path at all.
+  Simpler (no streamer code to write/deploy/maintain) and cheaper (no Worker
+  invocations; R2 egress is free, storage/read ops sit comfortably in the free
+  tier). The custom domain is a **subdomain → cross-origin**, which is fine for the
+  *wasm* because we fetch it ourselves in **CORS mode**: configure R2 CORS to send
+  `Access-Control-Allow-Origin` for the app origin, giving a **non-opaque** response
+  that `WebAssembly.instantiate(Streaming)` accepts. `COEP: credentialless` (U0)
+  permits this — credentialless only strips credentials from *no-cors* subresources;
+  an explicit CORS fetch with `ACAO` is unaffected. Emscripten's default wasm fetch
+  may need nudging to CORS mode (override via `Module.instantiateWasm`, or fetch the
+  bytes ourselves and hand over `Module.wasmBinary`).
+- **This is an "if it works" path — validated in U2, with a fallback.** The whole
+  approach hinges on the cross-origin CORS-mode wasm fetch succeeding under our
+  COOP/COEP headers; that's the **first thing the U2 bring-up proves**. If it
+  doesn't pan out, fall back to serving the wasm from a **same-origin path**
+  (`/<engine>/<tag>/simc.wasm`) via a Cloudflare Pages Function / Worker that
+  streams from R2 — robust but adds a (read-only) Function and, at high traffic,
+  Worker-invocation cost unless edge-cached. **This is not the optional OAuth/
+  sharing backend** (OVERALL_PLAN §3) either way.
+- **Versioning & integrity.** Pin the engine **tag** (`v1205.01`) in app config;
+  fetch by immutable versioned URL; verify the downloaded bytes against the
+  **sha256 in `manifest.json`** before instantiating, and surface a clear error on
+  mismatch. `data patch == engine patch` (OVERALL_PLAN §4): bumping the engine is a
+  config/tag change, decoupled from app redeploys.
+- **First-load UX.** 107 MB is a one-time, cacheable download. The engine load is
+  **lazy** (only when a real run is first requested) and behind a progress state;
+  cache via the Cache API / service worker keyed by version so patch bumps
+  invalidate cleanly. The U0 `crossOriginIsolated` guard already gates whether
+  threads are even available.
+- **What's *not* in the release.** No `talents.json` / `item-index.json` yet
+  (§5 "Adopt the engine-data bundle" + §10). The talent tree stays on the §6.5
+  fallback / sample fixture; the
+  item-search index is a Phase 2 concern regardless.
 
 ---
 
@@ -153,9 +254,9 @@ src/
     quick-sim/    # the vertical slice: compose → progress → report (§6)
     sim-options/  # shared fight-style/length/targets/precision controls (chips + popovers)
     character/    # parsed-character preview: identity, gear panel, talent tree (read-only now)
-    advanced/     # raw simc input editor (CodeMirror) — Quick Sim follow-on (U3)
+    advanced/     # raw simc input editor (CodeMirror) — Quick Sim follow-on (U4)
     report/       # report rendering + charts (shared by Quick Sim and later sim types)
-    history/      # Dexie-backed run history (U4)
+    history/      # Dexie-backed run history (U5)
   lib/            # zod schemas, utils, crossOriginIsolated guard, Wowhead Power-script loader
 ```
 
@@ -168,12 +269,17 @@ feature modules from the start.
 
 ## 5. Phased build — v1 (Phases 0 + 1 of `OVERALL_PLAN.md`)
 
-> v1 ships running against `MockEngine` and has **no wasm/build dependency**.
-> Item/spell *display* comes from **Wowhead at runtime** (the "Power" script +
-> icon CDN — an external runtime dependency, not a build/bundle one), and the
-> talent-tree layout is mocked from a sample fixture until the real engine-data
-> bundle lands. Swapping in the real engine (U5) is the final integration step
-> once the fork lands.
+> **Re-sequenced for the real engine (v0.3).** The engine seam is established
+> against the **mock first** (U1), the **real `WasmEngine` is brought up
+> immediately after as a spine** (U2) — booting `simc-wasm v1205.01`, running a
+> trivial sim end-to-end, and finalizing the report/parse schemas against real
+> `json2` — and only **then** is the polished Quick Sim UI built on top (U3),
+> running against either engine. This front-loads the one genuinely hard, novel
+> integration (107 MB cross-origin-isolated threaded wasm) instead of saving it
+> for last. Item/spell *display* still comes from **Wowhead at runtime** (the
+> "Power" script + icon CDN), and the **talent-tree layout stays on a sample
+> fixture** — the engine-data bundle (`talents.json`) is **not** in `v1205.01`
+> (§3.1, §10), so its arrival is a small later adoption step, not a gate.
 
 **Phase U0 — Foundation & theming spine — ✅ complete**
 - Vite + React + TS scaffold; ESLint/Prettier; CI (lint + typecheck +
@@ -187,19 +293,48 @@ feature modules from the start.
   `/styleguide` route.
 - App shell: sidebar, content header strip, route skeleton (TanStack Router).
 
-**Phase U1 — Engine seam**
+**Phase U1 — Engine seam + MockEngine**
 - `SimEngine` interface (`init` / `inspect` / `run` / `cancel`) + Zod
   `SimInput` / `ParsedCharacter` / `SimReport` schemas, modeled on sample simc
   `json2` + parse output. `ParsedCharacter` is **id-centric** (identity + per-slot
   item/bonus/gem/enchant ids + selected talent node ids/ranks) — Wowhead renders
   the rich display from those ids, so no stat lines need to be schema'd (§3, §10).
+  These schemas are **provisional** here and finalized against real `json2` in U2.
 - `MockEngine` in a worker via Comlink: `inspect()` returns a real-shaped parsed
   character; `run()` streams progress + supports cancel.
 - `EngineInfo` panel / sidebar status chip (cores, threads, isolation status —
   `DESIGN_SYSTEM` §8.15).
+- Engine **factory + env flag** scaffolded now (mock is the only implementation
+  yet), so U2 drops the real engine in without restructuring.
 
-**Phase U2 — Quick Sim (the first feature)** — *full spec in §6.* The cohesive
-vertical slice:
+**Phase U2 — `WasmEngine` bring-up (the engine spine)** — *consumption contract
+in §3.1.* This is OVERALL_PLAN's "Phase 0 spine" realized on the web side:
+proving the real client-side sim end-to-end **before** investing in polished UI.
+- **Artifact hosting + the cross-origin proof (do this first).** Vendor `simc.js`
+  same-origin; host the versioned `simc.wasm` on an **R2 custom domain** (no
+  Worker) with CORS for the app origin; pin tag `v1205.01`; verify bytes against
+  the `manifest.json` sha256 (§3.1). **Validate the cross-origin CORS-mode wasm
+  fetch + instantiate works under our COOP/COEP before building anything else** —
+  if it doesn't, switch to the same-origin Pages-Function streamer fallback (§3.1).
+- **`WasmEngine` implementation.** Host worker `import`s `createSimc`, sizes the
+  pthread pool to cores, writes the `.simc` profile to MEMFS, runs `main()` with
+  `json2=out.json` + run args, reads/`Zod`-parses `out.json`. `run()` streams
+  progress (iterations / `target_error`) + supports `cancel()`; `inspect()` is a
+  minimal-iteration parse pass yielding `ParsedCharacter`.
+- **End-to-end validation harness.** A dev-only route/panel that loads the engine,
+  confirms `crossOriginIsolated === true` and real multi-core usage, runs a pasted
+  `/simc` Quick Sim, and dumps the raw + parsed report. No polished UI yet — this
+  is the de-risking spike.
+- **Schema finalization.** Lock `SimReport` (incl. the DPS-distribution data for
+  the histogram — needs the distribution-collection flag) and `ParsedCharacter`
+  against **real `json2`**, then re-shape the `MockEngine` fixtures to match so the
+  mock stays a faithful stand-in (§10).
+- The factory now selects mock **or** real via the env flag; mock remains the
+  default for fast UI iteration.
+
+**Phase U3 — Quick Sim (the first feature)** — *full spec in §6.* The cohesive
+vertical slice, now buildable against **either** engine (real for fidelity, mock
+for fast loops):
 - **Wowhead display layer (shared infra — build first).** A thin `WowheadTooltip`
   + icon wrapper in `ui/` that loads the Wowhead "Power" script
   (`wow.zamimg.com/js/tooltips.js`) once and renders item/spell/enchant/gem
@@ -217,29 +352,31 @@ vertical slice:
   (with the "Show advanced" disclosure: casts / crit% / execute%), buff & debuff
   uptimes; ability icons/tooltips via the Wowhead layer. Built to `report.html`
   **minus** the Stat Scaling block (that block is Stat Weights — deferred; see §7).
-- **Talent-tree data** — built in U2 against a **sample `talents.json` fixture**
-  (the simc-derived tree layout, mocked alongside `MockEngine`); the real
-  per-patch bundle ships with the engine in U5. If absent, the §6.5 fallback
-  (compact loadout-string + named list) keeps Quick Sim shippable.
+- **Talent-tree data** — built against a **sample `talents.json` fixture** (the
+  simc-derived tree layout, mocked alongside `MockEngine`), because the real
+  per-patch bundle is **not yet in the engine release** (§3.1). If the fixture is
+  absent, the §6.5 fallback (compact loadout-string + named list) keeps Quick Sim
+  shippable.
 - **States** — empty, invalid-input, inspecting, running, error — all themed.
+  Because the real engine exists, `running`/`report`/`error` are exercised against
+  **real sims** here, not only the mock's faked progress.
 
-**Phase U3 — Quick Sim follow-ons (still Phase 1)**
+**Phase U4 — Quick Sim follow-ons (still Phase 1)**
 - **Advanced mode** — raw `.simc` input editor (CodeMirror) feeding the same
   `inspect()` + `run()` path. Almost free once Quick Sim works.
 - **Report actions** — Copy report / Export JSON from the report action row.
 
-**Phase U4 — Report polish + local history**
+**Phase U5 — Report polish + local history**
 - Richer themed report visualizations.
 - Dexie-backed run history (list, reopen, delete) + **Save to history** from the
   report action row; gives the report a persistable identity / deep link.
 
-**Phase U5 — Real-engine integration (gated on the fork)**
-- Implement `WasmEngine`, swap the factory flag, validate that the real
-  `json2` report and `inspect()` parse render through the existing components.
-- Load the real **engine-data bundle** shipped with the fork (`talents.json` for
-  the tree layout; `item-index.json` later for Gear search — `OVERALL_PLAN` §6),
-  replacing the U2 sample fixture; confirm the talent tree renders from real data.
-- No UI changes expected beyond swapping the fixture for the bundle.
+**Adopt the engine-data bundle (when a later engine release adds it).** Not a
+phase — a small, non-gating adoption step. When a `simc-wasm` release ships
+`talents.json` (and later `item-index.json` for Gear), load it from the versioned
+engine path and replace the U3 sample fixture; the talent tree then renders from
+real per-patch data with **no UI change** (the §6.5 fallback already absorbs its
+absence). `item-index.json` is otherwise a Phase 2 / Gear concern (§7).
 
 ---
 
@@ -258,7 +395,7 @@ empty ──paste──► inspecting ──ok──► ready ──RUN──►
    └──────────────────┴── error ◄──────┴──────────────┴── cancel ──────┘
 ```
 
-Report persistence (stable URL / id) arrives with history in U4; until then the
+Report persistence (stable URL / id) arrives with history in U5; until then the
 report is in-memory transient state of this route.
 
 ### 6.1 Compose screen — shell & options
@@ -361,8 +498,8 @@ Built to `docs/mockups/report.html` against the tokens, with two scope deltas:
      **"Show advanced metrics"** progressive disclosure (§8.14) revealing the
      Casts / Crit% / Execute% columns.
   4. **Buff & debuff uptimes** grid (`DESIGN_SYSTEM` §8.12).
-  5. **Action row** — present from U2 but several actions are **deferred**: Copy
-     report / Export JSON land in U3; Save to history in U4. Timestamp shown.
+  5. **Action row** — present from U3 but several actions are **deferred**: Copy
+     report / Export JSON land in U4; Save to history in U5. Timestamp shown.
 - **Excluded from the first report:** the mockup's **Stat Scaling** block. That
   is Stat Weights (a `scale_factors` run) — a separate, slower sim mode that
   `OVERALL_PLAN` scopes to Phase 4. The "Show advanced metrics" columns
@@ -411,7 +548,7 @@ build. Token-grounded intent:
   advanced area.
 - **Polish (Phase 4 UI):** report sharing (needs the optional CF Worker/API),
   Armory import form, settings, user-facing theme switcher, in-place gear/talent
-  **editing** (flipping the `interactive` seams built in U2 to live).
+  **editing** (flipping the `interactive` seams built in U3 to live).
 
 All later phases inherit the same token system and engine seam — no architectural
 change, just new `features/`.
@@ -457,26 +594,38 @@ in Quick Sim (§10).
 
 ## 10. Open items to revisit
 
-- **Talent-tree definition data — the one structural dependency.** The full
-  read-only tree grid (§6.5) needs node/position/edge/icon/max-rank data per class,
-  spec, and hero tree. `inspect()` only yields *which* nodes are selected, not the
-  tree shape, and Wowhead's tooltip embed renders individual talents but does **not**
-  hand us the tree graph. **Source:** an **additive, read-only script in the simc
-  fork's CI** emits a compact `talents.json` (not a source patch → keeps the fork
-  rebaseable, `OVERALL_PLAN` §5) — from simc's trait data if it carries node
-  positions/edges, otherwise from Blizzard's Talent Tree API. Either way it's a
-  per-patch byproduct, *not* a hand-maintained or Wowhead-replacement DB
-  (`OVERALL_PLAN` §6, layer 3). Still **tracked as a named risk** with the §6.5
-  fallback (compact loadout-string + named-list view) so Quick Sim ships regardless
-  of when the tree data lands; scope it alongside U2.
-- `inspect()` fidelity — now **lower-risk**: because Wowhead renders the rich
-  display (names, icons, quality, stat lines) from item/spell ids, `inspect()` only
-  needs to emit **identity + per-slot item ids/bonus ids + selected talent node
-  ids**, not full stat lines. Finalize `ParsedCharacter` against a real simc parse
-  pass once the fork can emit one (the item/bonus ids and talent node ids are the
-  fields that matter and the ones most likely to drift).
-- Report schema fidelity — finalize `SimReport` (incl. the DPS-distribution data
-  for the histogram) against real `json2` samples once the fork emits them.
-- CodeMirror simc syntax highlighting — basic editor first (U3); custom language
+- **Talent-tree definition data — now the *one remaining* fork dependency, and
+  it's NOT in `v1205.01`.** The engine release shipped the wasm + glue only (§3.1);
+  the engine-data bundle (`talents.json`/`item-index.json`) has **not** landed yet.
+  The full read-only tree grid (§6.5) needs node/position/edge/icon/max-rank data
+  per class, spec, and hero tree. `inspect()` only yields *which* nodes are
+  selected, not the tree shape, and Wowhead's tooltip embed renders individual
+  talents but does **not** hand us the tree graph. **Source:** an **additive,
+  read-only script in the simc fork's CI** emits a compact `talents.json` (not a
+  source patch → keeps the fork rebaseable, `OVERALL_PLAN` §5) — from simc's trait
+  data if it carries node positions/edges, otherwise from Blizzard's Talent Tree
+  API. Until a release adds it, Quick Sim ships on the §6.5 fallback (compact
+  loadout-string + named-list view); adoption when it lands is a no-UI-change step
+  (§5). **Action:** confirm with the fork whether the next release will attach the
+  data bundle, or whether the web repo should derive `talents.json` itself in the
+  interim.
+- `inspect()` realization & fidelity — **now actionable, not blocked.** The fork
+  can emit real `json2`, so finalize `ParsedCharacter` in **U2** against a real
+  parse pass (identity + per-slot item/bonus/gem/enchant ids + selected talent node
+  ids/ranks — Wowhead renders the rich display, so no stat lines needed). Open
+  detail: the exact simc invocation that yields a parse-only echo cheaply
+  (minimal-iteration run vs. a dedicated flag) — pin it during U2 bring-up.
+- Report schema fidelity — **resolved by U2.** Finalize `SimReport` (incl. the
+  DPS-distribution data for the histogram, which needs the distribution-collection
+  run flag) against the **real `json2`** the engine now emits, then re-shape the
+  `MockEngine` fixtures to match.
+- Engine artifact hosting — **chosen: R2 custom domain, no Worker** (`simc.js`
+  vendored same-origin, `simc.wasm` cross-origin via CORS — §3.1), for simplicity
+  and cost. **The open risk is the cross-origin CORS-mode wasm fetch under
+  `COEP: credentialless`** — prove it in the U2 spike; fall back to a same-origin
+  Pages-Function streamer if it fails. Confirm R2 CORS config, immutable
+  cache-control headers, and the exact Emscripten hook (`Module.instantiateWasm`
+  vs. `wasmBinary`) for forcing CORS mode.
+- CodeMirror simc syntax highlighting — basic editor first (U4); custom language
   mode is a later enhancement.
 - Theme switcher exposure — mechanism shipped in U0, surfaced to users in Phase 4.

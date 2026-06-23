@@ -10,18 +10,23 @@ stays lightweight and cheap/free to host — no sim queue, no per-sim server cos
 This repo is **only the React web UI**. Sibling repo (not here):
 
 - **`simc` fork** — SimulationCraft compiled to threaded WASM via Emscripten.
-  Its CI also emits a versioned **engine-data bundle** (`simc.wasm` +
-  `talents.json` + `item-index.json`) extracted read-only from simc's own baked
-  game data. Being built in parallel. **Do not depend on it yet** — the UI targets
-  a typed `SimEngine` interface with a `MockEngine`, and the real `WasmEngine` is a
-  one-line factory swap later.
+  **The engine has shipped:** [`simc-wasm`
+  `v1205.01`](https://github.com/a-vasilev/simc-wasm/releases/tag/v1205.01)
+  publishes `simc.js` (ES6 `createSimc` glue) + `simc.wasm` (~107 MB, threaded/
+  SIMD) + `manifest.json` (base SHA + sha256s). The UI still targets the typed
+  `SimEngine` seam, but there are now **two real implementations**: `MockEngine`
+  (fast iteration/offline) and `WasmEngine` (consumes the release). The real engine
+  is brought up **early as a spine** (WEB_UI_PLAN U2), not last. **Caveat:** the
+  release is **wasm + glue only** — the **engine-data bundle (`talents.json` /
+  `item-index.json`) has NOT shipped yet**, so the talent tree runs on a sample
+  fixture / fallback until a later release adds it (WEB_UI_PLAN §3.1, §10).
 
 **There is no separate `data` repo** (the Wowhead decision removed the display-data
 pipeline that would have justified one). Item/spell **display** comes from Wowhead at
 runtime (no bundle); the **talent-tree + item-search** data is the engine-data bundle
-above — additive, read-only CI tooling in the fork (*not* source patches, so the fork
-stays trivially rebaseable); **Droptimizer loot tables** are a web-repo CI job added
-at Phase 3. See OVERALL_PLAN §4/§6.
+(additive, read-only CI tooling in the fork — *not* source patches, so the fork stays
+trivially rebaseable — **pending**, not in `v1205.01`); **Droptimizer loot tables**
+are a web-repo CI job added at Phase 3. See OVERALL_PLAN §4/§6.
 
 Full context: [`docs/OVERALL_PLAN.md`](./docs/OVERALL_PLAN.md) (product +
 architecture), [`docs/WEB_UI_PLAN.md`](./docs/WEB_UI_PLAN.md) (this app's phased
