@@ -47,10 +47,13 @@ design phase dresses.
 
 ## Cross-origin isolation
 
-Multithreaded WASM needs `SharedArrayBuffer`, which requires COOP/COEP headers.
-Set in dev via `vite.config.ts` and in prod via [`public/_headers`](./public/_headers).
-A runtime guard (`src/lib/crossOriginIsolated.ts`) surfaces a banner if
-isolation is unavailable.
+Multithreaded WASM needs `SharedArrayBuffer`, which requires `COOP: same-origin`
++ `COEP: credentialless`. We use `credentialless` (not `require-corp`) so the
+cross-origin Wowhead tooltip script + icon CDN load while the page stays isolated
+(see [`docs/OVERALL_PLAN.md`](./docs/OVERALL_PLAN.md) §1/§6). Set in dev via
+`vite.config.ts` and in prod via [`public/_headers`](./public/_headers). A runtime
+guard (`src/lib/crossOriginIsolated.ts`) surfaces a banner if isolation is
+unavailable.
 
 ## Deployment (Cloudflare Pages)
 

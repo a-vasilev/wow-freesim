@@ -503,7 +503,7 @@ The report page constrains content to `max-width: 1100px; margin: 0 auto` with `
 </svg>
 ```
 
-**Item and ability icons** are real WoW game artwork — per-record 64×64 (or 56×56) JPEG images. Each item and spell record in the `data` bundle carries an `icon` name (e.g. `"inv_helmet_25"`). In the mockups these load from the Wowhead CDN:
+**Item and ability icons** are real WoW game artwork — per-record 64×64 (or 56×56) JPEG images, identified by an `icon` name (e.g. `"inv_helmet_25"`) sourced from the engine parse (`inspect()`) and/or Wowhead's tooltip data (the `icon` field), **not** a display bundle of our own. The image itself loads from the Wowhead CDN:
 
 ```
 https://wow.zamimg.com/images/wow/icons/large/<name>.jpg
@@ -519,7 +519,7 @@ with an `onerror` fallback to `inv_misc_questionmark.jpg`:
 />
 ```
 
-**Production assets caveat:** The game icons are Blizzard Entertainment's artwork. Hotlinking from `wow.zamimg.com` (the Wowhead CDN) is acceptable for development mockups and initial testing, but the shipped product should source icons from a properly-licensed or self-hosted asset bundle. This is a follow-up task for the `data` repo — the icon pipeline should produce a bundled asset manifest (or a proxied CDN path under the app's own domain) rather than depending on Wowhead's CDN in production. This does not block initial development but must be resolved before launch.
+**Production approach:** Hot-linking icons from `wow.zamimg.com` (the Wowhead CDN) is the **intended, permanent** approach — not just a dev placeholder. It's the universal practice, the CDN sends `Access-Control-Allow-Origin: *`, and under our `COEP: credentialless` headers (OVERALL_PLAN §1) a plain no-cors `<img>` loads without needing a `crossorigin` attribute. The game icons are Blizzard's artwork surfaced via Wowhead; show a visible "Item & spell data from Wowhead" attribution. We deliberately do **not** build a self-hosted icon/display bundle (OVERALL_PLAN §6). A Cloudflare-Worker icon proxy under our own domain is an optional later hardening, not a launch blocker.
 
 Icon display sizes in components:
 
@@ -666,9 +666,13 @@ The DPS bar is 3px high, `bg-bar-track` track, proportional fill (100% = winner)
 
 ### 8.8 WoW item tooltip
 
-The tooltip is a first-class component. It must remain game-authentic regardless of UI theme changes. Players use it to verify item stats, not as a UI affordance — it should feel identical to the in-game tooltip.
+**Rendering path (decided — OVERALL_PLAN §6):** the item/spell tooltip is rendered by the **Wowhead "Power" script** from the item/spell id (+ `bonus=`/`ilvl=`/`gems=`/`ench=` mapped from the simc string) — zero markup of ours, game-authentic, no data bundle. The line-by-line spec below is retained as the **visual reference** for that game-authentic appearance (which Wowhead's tooltip already matches); we do not hand-build this tooltip in the normal path.
 
-**Box:**
+The tooltip must remain game-authentic regardless of UI theme changes. Players use it to verify item stats, not as a UI affordance — it should feel identical to the in-game tooltip.
+
+**Integration (what we own vs. what Wowhead controls):** All we author is the **anchor** — the slot tile / ability row (the icon, quality border, and the `<a>`/`data-wowhead` attributes that hand Wowhead the id + `bonus=`/`ilvl=`/`gems=`/`ench=`). The **box, its layout, the line content, positioning, and the show/hide trigger are entirely Wowhead's** (its Power script reads the attributes and renders the floating tooltip). So the `--c-tooltip-*` tokens, the **Box** table, and the **Positioning** notes below are a *reference of the appearance we expect Wowhead to produce* — not styles or behavior we implement. We only fall back to authoring this markup ourselves if we ever drop the Wowhead embed (not planned for v1). Wiring lives in the `WowheadTooltip` wrapper (`ui/`) + the Power-script loader (`lib/`).
+
+**Box** *(Wowhead-rendered — reference appearance, not styles we author):*
 
 | Property | Value |
 |----------|-------|
@@ -705,7 +709,7 @@ The tooltip is a first-class component. It must remain game-authentic regardless
 
 Sections without optional content are omitted entirely (no empty `<hr>`s). The near-white body color (`#e8e8e8`) is used rather than `text-fg` (`--ink-100`) because the tooltip background is pure black, not the warm canvas color.
 
-**Positioning:** The tooltip renders to the right of its anchor (`left: calc(100% + 10px), top: 50%, transform: translateY(-50%)`). In a right-column context it renders to the left. Weapons-row tooltips render upward (`bottom: calc(100% + 10px), left: 50%`). Triggered by `:hover` (opacity 0 → 1, `transition: opacity 0.1s`).
+**Positioning** *(Wowhead-controlled):* Wowhead's script positions the floating tooltip itself (it flips side to stay in viewport) and shows/hides it on pointer hover of the anchor. The values that follow describe the in-game-like placement we expect — to the right of the anchor, flipping left in a right-column context, upward for weapon rows — but we do **not** set them; the only thing on our side is where the anchor sits in the layout. See §10 for the keyboard/focus accessibility caveat this introduces.
 
 ### 8.9 Stat list
 
@@ -885,7 +889,7 @@ The `body` base rule in `theme.css` sets `font-variant-numeric: tabular-nums` gl
 
 ### Keyboard targets
 
-All slot tiles, candidate rows, and toggle buttons receive `tabindex="0"` when interactive. WoW tooltip display is triggered by `:hover` in the mockup; in the React implementation it should also be triggered on `:focus-visible` (using Radix Tooltip or a ARIA-compliant implementation) so keyboard users can read item stats.
+All slot tiles, candidate rows, and toggle buttons receive `tabindex="0"` when interactive. **Caveat — the WoW item/spell tooltip is now Wowhead-rendered (§8.8) and is pointer/hover-driven; it is not focus- or keyboard-triggerable out of the box and is not ARIA-compliant.** Keyboard users therefore cannot read item stats via that tooltip. Mitigations: anchor each item to its Wowhead page (`<a href>` is keyboard-reachable and announces the item), keep the item name/ilvl/quality visible in the tile itself (not tooltip-only), and treat a focus-triggerable custom tooltip as a later accessibility enhancement if we ever drop the Wowhead embed. Do not claim full keyboard parity for tooltip content while the Wowhead embed is the rendering path.
 
 ---
 

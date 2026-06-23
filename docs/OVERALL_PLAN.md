@@ -25,8 +25,13 @@ sim, get a report — all locally.
 - **Cross-origin isolation is mandatory.** Multithreaded WASM needs
   `SharedArrayBuffer`, which needs the page served with
   `Cross-Origin-Opener-Policy: same-origin` and
-  `Cross-Origin-Embedder-Policy: require-corp`. No headers → no threads → sim is
-  unusably slow.
+  `Cross-Origin-Embedder-Policy: credentialless`. No isolation → no threads → sim
+  is unusably slow. **We use `credentialless` rather than `require-corp`
+  deliberately:** it keeps the page isolated *and* lets cross-origin no-cors
+  subresources (the Wowhead tooltip script + icon CDN) load without CORP headers —
+  the mechanism behind our zero-bundle item/spell display (§6). Verified working
+  with `SharedArrayBuffer` live in Chrome/Edge/Firefox (Firefox default-on since
+  119).
 - **The data treadmill.** SimC bakes WoW game data into the binary, regenerated
   every patch (currently 12.0.7). "Update for the new patch" = rebuild the wasm
   from the new upstream tag + regenerate the data bundles. This must be
@@ -84,10 +89,10 @@ Five components; only the first three are needed for an MVP.
 [ simc.wasm module ] ──spawns──► [ pthread pool across N cores ]
         ▲
         │  static fetch (lazy)
-[ Data bundles: items.json, loot.json ]  ← published per patch
+[ Data bundles: loot.json, talents.json, item-index ]  ← published per patch
         ▲
-        │  hot-link, no auth
-[ Icon CDN (Wowhead/Blizzard) ]
+        │  embed / hot-link, no auth
+[ Wowhead tooltip script + icon CDN ]  ← item/spell display at runtime
 ```
 
 **1. Engine artifact (`simc.wasm` + JS glue).** simc compiled with Emscripten,
@@ -124,22 +129,28 @@ the fallback for hosts that can't set headers.
 
 ## 4. Repositories
 
-Three repos. The engine fork and its build live together; the app and the data
-pipeline are separate so a new patch is a contained job.
+Two active repos (+ one optional later). The engine fork owns both the build *and*
+the game-data export; the app consumes the results. **There is no separate `data`
+repo** — the Wowhead decision (§6) removed the item/spell *display* pipeline that
+would have justified one, and what's left is either an additive byproduct of the
+fork's build or a small web-repo job.
 
 - **`simc` (your fork)** — a fork of `simulationcraft/simc` with your changes as
-  **ordinary commits on a `wasm` branch** (no patch files). Holds both the small
+  **ordinary commits on a `wasm` branch** (no patch files). Holds the small
   engine-source delta (Emscripten build target + `#ifdef __EMSCRIPTEN__` tweaks)
   *and* the Emscripten toolchain files + CI. Daily work is plain git. Per-patch
-  update is `git rebase <new-base-sha> wasm` (see §4 mechanics). CI builds from
-  the pinned base commit, runs validation diffs vs native simc, publishes the
-  versioned wasm artifact. (Split the build out into its own repo later only if
-  you hit a concrete reason — you won't for a long while.)
-- **`web`** — the React/TS app. Consumes the published wasm artifact + data
-  bundles. Where most ongoing feature work lives.
-- **`data`** — the pipeline scripts that generate item DB + Droptimizer loot
-  tables per patch (from Blizzard API / wago.tools). Emits versioned static
-  JSON/SQLite. Isolating this makes a new season "rerun the data job."
+  update is `git rebase <new-base-sha> wasm` (see §4 mechanics). CI builds from the
+  pinned base commit, runs validation diffs vs native simc, and publishes a
+  versioned **engine-data bundle**: `simc.wasm` + `talents.json` + `item-index.json`.
+  The latter two are extracted **read-only** from simc's own baked data by an
+  additive CI script (**new files, never source edits → the rebaseable delta is
+  unchanged**; see §5). Bundling them with the wasm makes `data patch ==
+  engine patch` automatic. (Split the build into its own repo later only if you hit
+  a concrete reason — you won't for a long while.)
+- **`web`** — the React/TS app. Consumes the published engine-data bundle. Where
+  most ongoing feature work lives. At **Phase 3** it also hosts the **Droptimizer
+  loot pipeline** — a scheduled CI job hitting the Blizzard Journal API →
+  `loot.json` — the one dataset not derived from simc.
 - **`api`** *(optional, later)* — Cloudflare Workers for Armory OAuth + report
   sharing.
 
@@ -237,6 +248,16 @@ new patch: `git fetch upstream`, pick a newer base commit on the retail branch,
 then `git rebase <new-sha> wasm`, resolve the (small) conflicts, record the SHA,
 let CI build. No tags from upstream to chase, no patch files — just git.
 
+**The game-data export is *not* part of this delta.** Emitting `talents.json` /
+`item-index.json` (§4, §6) is a **read-only** job: an additive CI script + workflow
+in **new files** (a `tools/` dir, a workflow YAML) in directories upstream never
+touches, reading simc's already-generated data — and it can piggyback on the native
+simc build CI already makes for the validation diff, so no extra build. `git rebase`
+replays new-file commits cleanly, so the export adds **~zero rebase risk**; it needs
+only a *script edit* (never a merge) in the rare case simc/Blizzard changes a data
+*schema*. The fork's rebaseable delta stays exactly the build + threading tweaks
+above — adding the data export does **not** make the fork heavier to maintain.
+
 ### Binary size
 
 simc + baked game data compiles to a large `.wasm` (tens of MB). It's a one-time
@@ -262,26 +283,56 @@ mostly a green checkmark.
 
 ## 6. Deep dive B — data pipeline
 
-### Stop treating "the data" as one thing — it's three
+### Stop treating "the data" as one thing — it splits by *who provides it*
 
-1. **Item stats for the sim itself → already inside simc.** simc bakes ItemSparse
-   et al. into the binary; that's how it sims items. For sim *correctness* you
-   fetch nothing.
-2. **Item display data for the UI (name, icon, slot, quality) → for the
-   pickers.** Names/slots/quality from the same DB tables, via **wago.tools**
-   (raw DB2 as CSV/JSON, updated on patch day, often ahead of Blizzard) or
-   simc's own `dbc_extract`. **Icons: never bundle — hot-link at runtime from a
-   CDN** (Wowhead's icon CDN is keyed by icon name, no auth; universal practice).
-3. **Loot source tables (what drops where, by difficulty) → for Droptimizer.**
-   The hard dataset. Authoritative source: Blizzard Game Data **Journal APIs**
-   (journal-instance → journal-encounter → per-encounter items, with difficulty
-   / item-level context) — exactly Droptimizer's input shape. Same relationships
-   exist in raw DB2 (JournalInstance/JournalEncounter/JournalEncounterItem +
-   ItemSparse) via wago.tools. **The long tail** (vendors, crafting, PvP,
+Four layers, and only the last is a pipeline we meaningfully maintain. **Decision
+(settled): we never build or maintain our own item/spell *display* database — not
+now, not long-term. Wowhead provides all display data at runtime.**
+
+1. **Sim correctness → baked into `simc.wasm`.** simc bakes ItemSparse, spell
+   coefficients, talent effects, and set bonuses into the binary; that's how it
+   sims. For sim *correctness* you fetch nothing, ever.
+2. **Item/spell *display* (names, icons, quality, full stat tooltips) → Wowhead,
+   at runtime. No bundle.** This is the big change from v0.1. The raw `/simc`
+   string and `json2` report carry only **IDs** (item + bonus + gem + enchant ids;
+   spell ids in the ability breakdown). We hand those IDs to **Wowhead's "Power"
+   tooltip script** (`wow.zamimg.com/js/tooltips.js`) and **icon CDN**, which
+   render the icon and the full game-authentic tooltip — items *and* spells,
+   including enchants and gems. Crucially, the item `bonus=`/`ilvl=`/`gems=`/`ench=`
+   params map **directly** from a simc item string, so customized items (Top
+   Gear / Droptimizer candidates the player doesn't own) tooltip correctly too.
+   - Works on an isolated page **only because COEP is `credentialless`** (§1); a
+     plain no-cors `<script>`/`<img>` is exempt from the CORP requirement there.
+     Empirically verified with `SharedArrayBuffer` live.
+3. **Structural data Wowhead's embed can't provide → derived from simc, small.**
+   The embed is *display-by-ID*; it provides neither a **talent-tree layout**
+   (nodes / positions / edges / max-ranks per class, spec, hero tree) nor a
+   **searchable item catalog** (needed for "add an item I don't own" in Top Gear —
+   the embed has no bulk search, and scraping Wowhead's search is out). Both are
+   emitted by an **additive, read-only script in the fork's CI** — *not* a source
+   patch and *not* a hand-maintained parallel DB, so the fork stays trivially
+   rebaseable (§5). `item-index.json` is a clean simc byproduct (simc bakes the item
+   tables). The talent-tree *layout* (node x/y + edges) comes from simc's trait data
+   **if it carries positions/edges**, else from Blizzard's Talent Tree API — either
+   way a read-only CI script, never a fork source change. **Not a Wowhead
+   replacement:** selected talents come from `inspect()`, item *display* from
+   Wowhead; only the tree *shape* and the *search list* come from here.
+4. **Loot-source tables (what drops where, by difficulty) → Blizzard Journal API,
+   prebuilt. Droptimizer only (Phase 3).** The one genuinely maintained dataset.
+   Authoritative source: Blizzard Game Data **Journal APIs** (journal-instance →
+   journal-encounter → per-encounter items, with difficulty / item-level context)
+   — exactly Droptimizer's input shape. **The long tail** (vendors, crafting, PvP,
    events) isn't fully in the Journal — stitching those in is the laborious part
-   that makes this a maintained pipeline, not a one-off export.
+   that makes this a maintained pipeline, not a one-off export. Wowhead never
+   offered this in embeddable form, so it's a different dataset, not a display
+   substitute.
 
-### The core decision: pre-build static bundles, NOT live API calls
+### For the data we *do* build (layers 3–4): pre-build static bundles, NOT live API calls
+
+This applies to **Blizzard-sourced loot tables and the simc-derived structures** —
+*not* to display data. (Display is live Wowhead, which is fine: it's public, needs
+no auth, is rate-friendly per-item-on-hover, and is the universal practice — see
+*Licensing & etiquette* below.) For the Blizzard/structural data:
 
 | Reason | Detail |
 |---|---|
@@ -292,23 +343,36 @@ mostly a green checkmark.
 
 ### Pipeline shape
 
-**Build time (`data` repo CI):** authenticate to Blizzard and/or pull
-wago.tools → extract instances/encounters/items + item metadata → normalize into
-compact **versioned** bundles (`data/12.0.7/loot.json`, `items.json`) → publish
-as static assets (Cloudflare Pages asset or R2, edge-cached, ETag'd).
+Two producers, no separate `data` repo (§4):
 
-**Runtime (app):** lazy-load the relevant bundle (Quick Sim needs none; load the
-Droptimizer dataset only when that tab opens — preserves the lightweight
-promise) → populate pickers / source lists → generate simc profileset input from
-the selection. Icons fetched on demand from the CDN.
+**Engine-data bundle (simc fork CI):** alongside the wasm build, a read-only script
+extracts `talents.json` + `item-index.json` from simc's own baked data → publish
+**versioned with the wasm** (`<patch>/talents.json`, `<patch>/item-index.json`), so
+data patch == engine patch automatically.
+
+**Loot pipeline (web repo CI, Phase 3):** authenticate to Blizzard's Journal API
+(and/or pull wago.tools for the long tail) → extract instances/encounters/items →
+normalize into a compact **versioned** `<patch>/loot.json` → publish as a static
+asset (Cloudflare Pages asset or R2, edge-cached, ETag'd).
+
+**Runtime (app):** lazy-load only what a screen needs (Quick Sim needs none — its
+talent grid uses the engine bundle's `talents.json` and otherwise falls back to a
+flat list; load the Droptimizer dataset only when that tab opens — preserves the
+lightweight promise) → populate pickers / source lists → generate simc profileset
+input from the selection. **Item/spell display + icons come from Wowhead at
+runtime** (no bundle), not from these files.
 
 **Only inherently-live call:** optional Armory character import by name (Profile
 API, per-user, via the token broker). Everything else is static.
 
 ### Format & in-app use
 
-- A few MB of items → plain JSON + a client-side search index (Fuse.js or a
-  prebuilt inverted index).
+- The **item search index** (layer 3 — id / name / slot / ilvl / icon-name /
+  valid bonus options, enough to search and to synthesize a simc item string) is a
+  few MB → plain JSON + a client-side search index (Fuse.js or a prebuilt inverted
+  index). It is the *search list only*; the rich tooltip on each result is still
+  rendered by Wowhead from the item id. Derived automatically from simc's baked
+  data, not hand-curated.
 - If it grows large and you want indexed queries → a prebuilt SQLite queried via
   a wasm SQLite build.
 - **Decouple data from app releases:** hosting bundles on Cloudflare/R2 lets you
@@ -317,14 +381,22 @@ API, per-user, via the token broker). Everything else is static.
 
 ### Licensing & etiquette
 
-- Game data is Blizzard's. Use their API under ToS (attribution, fan-content
-  rules) — the clean path.
-- wago.tools is a community service: pull it in CI, cache it, don't hammer it
-  per-user.
-- Icon CDN hot-linking is fine and universal; **bulk-scraping Wowhead pages is
-  not** — don't.
+- **Wowhead tooltips + icon CDN** are our display layer. Embedding the "Power"
+  script and hot-linking `wow.zamimg.com` icons is the **intended, universal**
+  use (Wowhead promotes it; the icon CDN sends `Access-Control-Allow-Origin: *`).
+  Show a visible "Item & spell data from Wowhead" attribution. The script fetches
+  tooltip data **per-item, on hover** (cached client-side), which is rate-friendly.
+  **Do not bulk-scrape Wowhead** to pre-build a database — that's both against
+  form and the thing we've decided not to do anyway.
+- **Read Wowhead's ToS once before public launch** to confirm the
+  data-reuse/attribution terms for the embed (the script path is the
+  clearly-endorsed use).
+- Game data is Blizzard's. The Journal/loot pipeline uses their API under ToS
+  (attribution, fan-content rules) — the clean path. wago.tools, if used to
+  cross-check the simc-derived structures, is a community service: pull in CI,
+  cache, don't hammer per-user.
 - Don't depend on Raidbots' own internal/undocumented data files: fragile and
-  bad form. Own the pipeline from authoritative sources.
+  bad form. Own the built pipeline from authoritative sources.
 
 ---
 
@@ -361,9 +433,10 @@ meets the engine.
 | Worker comms | Comlink over a Web Worker |
 | Item search | JSON + Fuse.js (or prebuilt SQLite via wasm SQLite if large) |
 | Local history | IndexedDB (Dexie) |
-| Hosting | Cloudflare Pages (`_headers` for COOP/COEP) |
+| Hosting | Cloudflare Pages (`_headers` → `COOP: same-origin` + `COEP: credentialless`) |
 | Optional backend | Cloudflare Workers + KV/R2 (Armory OAuth, report sharing) |
-| Data sources | Blizzard Game Data/Journal API + wago.tools; icons via Wowhead CDN |
+| Display data | Wowhead "Power" tooltip script + icon CDN — item/spell/enchant/gem, at runtime, no bundle |
+| Built data | Blizzard Journal API (loot, Phase 3) + simc-derived talent-tree & item-search index |
 | CI | GitHub Actions (wasm rebuild + validation diff; data regen) |
 
 ---

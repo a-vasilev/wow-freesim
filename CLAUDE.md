@@ -7,13 +7,21 @@ Raidbots: it runs **SimulationCraft entirely client-side via WebAssembly**, so
 WoW sims execute on the user's own CPU cores instead of a server farm. The site
 stays lightweight and cheap/free to host — no sim queue, no per-sim server cost.
 
-This repo is **only the React web UI**. Two sibling repos (not here):
+This repo is **only the React web UI**. Sibling repo (not here):
 
 - **`simc` fork** — SimulationCraft compiled to threaded WASM via Emscripten.
-  Being built in parallel. **Do not depend on it yet** — the UI targets a typed
-  `SimEngine` interface with a `MockEngine`, and the real `WasmEngine` is a
+  Its CI also emits a versioned **engine-data bundle** (`simc.wasm` +
+  `talents.json` + `item-index.json`) extracted read-only from simc's own baked
+  game data. Being built in parallel. **Do not depend on it yet** — the UI targets
+  a typed `SimEngine` interface with a `MockEngine`, and the real `WasmEngine` is a
   one-line factory swap later.
-- **`data`** — per-patch item/loot bundle pipeline (Phase 2+).
+
+**There is no separate `data` repo** (the Wowhead decision removed the display-data
+pipeline that would have justified one). Item/spell **display** comes from Wowhead at
+runtime (no bundle); the **talent-tree + item-search** data is the engine-data bundle
+above — additive, read-only CI tooling in the fork (*not* source patches, so the fork
+stays trivially rebaseable); **Droptimizer loot tables** are a web-repo CI job added
+at Phase 3. See OVERALL_PLAN §4/§6.
 
 Full context: [`docs/OVERALL_PLAN.md`](./docs/OVERALL_PLAN.md) (product +
 architecture), [`docs/WEB_UI_PLAN.md`](./docs/WEB_UI_PLAN.md) (this app's phased
@@ -45,8 +53,20 @@ Cloudflare Pages.
   wasm directly. Build/test against `MockEngine` (worker that returns real-shaped
   `json2` samples).
 - **Cross-origin isolation is mandatory** for multithreaded WASM
-  (`SharedArrayBuffer` needs COOP/COEP headers). Set via Vite dev headers +
-  Cloudflare `_headers`; runtime guard checks `crossOriginIsolated`.
+  (`SharedArrayBuffer` needs `COOP: same-origin` + `COEP: credentialless`). We use
+  **`credentialless`, not `require-corp`**, on purpose: it keeps the page isolated
+  *and* lets the cross-origin Wowhead tooltip script + icon CDN load (no-cors, no
+  CORP headers) — that's what enables rich item/spell tooltips with no data bundle.
+  Set via Vite dev headers + Cloudflare `_headers`; runtime guard checks
+  `crossOriginIsolated`.
+- **Display data comes from Wowhead at runtime, never a bundle.** Item / spell /
+  enchant / gem names, icons, and full tooltips are rendered by the Wowhead "Power"
+  script (`wow.zamimg.com/js/tooltips.js`) + icon CDN, keyed by the IDs already in
+  the simc profile / `json2` (item `bonus=`/`ilvl=`/`gems=`/`ench=` map straight
+  from simc item strings). We deliberately **do not build or maintain our own
+  item/spell display database — ever.** The only generated data is what the embed
+  can't provide: loot-source tables (Droptimizer) + simc-derived talent-tree and
+  item-search structures (OVERALL_PLAN §6).
 - **Headless components only** (Radix/React Aria) — we own 100% of styling. No
   pre-styled component libraries.
 - **GPLv3.** The whole project is open source; no proprietary tier.
