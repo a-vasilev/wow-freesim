@@ -32,7 +32,13 @@ export function DistributionHistogram({ dps }: { dps: SampleStat }) {
   const barPx = (W - M.left - M.right) / BINS
 
   const gridY = [0.25, 0.5, 0.75, 1].map((d) => yScale(d))
-  const ticks = [lo, dps.mean, hi]
+  // ±1σ / ±2σ guide lines convey the spread the bars approximate.
+  const sigmaLines = [-2, -1, 1, 2].map((k) => ({ k, x: dps.mean + k * sigma }))
+  const ticks = [
+    { x: dps.mean - sigma, label: '−1σ' },
+    { x: dps.mean, label: Math.round(dps.mean).toLocaleString() },
+    { x: dps.mean + sigma, label: '+1σ' },
+  ]
 
   return (
     <figure className="flex flex-col gap-1">
@@ -45,6 +51,17 @@ export function DistributionHistogram({ dps }: { dps: SampleStat }) {
             x2={W - M.right}
             y1={y}
             y2={y}
+            stroke="var(--c-chart-grid)"
+            strokeWidth={1}
+          />
+        ))}
+        {sigmaLines.map(({ k, x }) => (
+          <line
+            key={k}
+            x1={xScale(x)}
+            x2={xScale(x)}
+            y1={M.top}
+            y2={H - M.bottom}
             stroke="var(--c-chart-grid)"
             strokeWidth={1}
           />
@@ -75,20 +92,22 @@ export function DistributionHistogram({ dps }: { dps: SampleStat }) {
         {ticks.map((t, i) => (
           <text
             key={i}
-            x={xScale(t)}
+            x={xScale(t.x)}
             y={H - 8}
-            textAnchor={i === 0 ? 'start' : i === ticks.length - 1 ? 'end' : 'middle'}
+            textAnchor={
+              i === 0 ? 'start' : i === ticks.length - 1 ? 'end' : 'middle'
+            }
             fill="var(--c-chart-axis)"
             className="font-mono"
             fontSize={11}
           >
-            {Math.round(t).toLocaleString()}
+            {t.label}
           </text>
         ))}
       </svg>
       <figcaption className="text-fg-faint text-xs">
-        Approximate distribution (normal curve from mean ± σ; simc does not export
-        per-iteration data).
+        Approximate distribution (normal curve from mean ± σ; simc does not
+        export per-iteration data).
       </figcaption>
     </figure>
   )

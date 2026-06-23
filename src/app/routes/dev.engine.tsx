@@ -66,7 +66,10 @@ function DevEnginePage() {
     setReport(null)
     setProgress(null)
     try {
-      const r = await engine.run({ profile, options: DEFAULT_SIM_OPTIONS }, setProgress)
+      const r = await engine.run(
+        { profile, options: DEFAULT_SIM_OPTIONS },
+        setProgress,
+      )
       setReport(r)
       setPhase('done')
     } catch (e) {
@@ -78,10 +81,11 @@ function DevEnginePage() {
     }
   }
 
-  const busy = phase === 'booting' || phase === 'inspecting' || phase === 'running'
+  const busy =
+    phase === 'booting' || phase === 'inspecting' || phase === 'running'
 
   return (
-    <section className="flex flex-col gap-6">
+    <section className="flex flex-col gap-6 px-7 py-6">
       <header className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-4">
           <h1 className="text-fg font-display text-2xl font-semibold">
@@ -178,8 +182,9 @@ function DevEnginePage() {
               {Math.round(report.dps.mean).toLocaleString()}
             </span>{' '}
             <span className="text-fg-subtle">
-              DPS ± {Math.round(report.dps.meanStdDev ?? 0)} · {report.character.name}{' '}
-              · {report.meta.iterations} iters · {report.meta.fightStyle}
+              DPS ± {Math.round(report.dps.meanStdDev ?? 0)} ·{' '}
+              {report.character.name} · {report.meta.iterations} iters ·{' '}
+              {report.meta.fightStyle}
             </span>
           </p>
           <table className="mt-3 w-full text-sm">
@@ -196,7 +201,9 @@ function DevEnginePage() {
               {report.abilities.slice(0, 12).map((a, i) => (
                 <tr key={`${a.id}-${i}`} className="text-fg-muted">
                   <td className="text-fg">{a.name}</td>
-                  <td className="text-right">{Math.round(a.dps).toLocaleString()}</td>
+                  <td className="text-right">
+                    {Math.round(a.dps).toLocaleString()}
+                  </td>
                   <td className="text-right">{a.damagePct.toFixed(1)}</td>
                   <td className="text-right">{a.casts.toFixed(1)}</td>
                   <td className="text-right">{a.critPct?.toFixed(1) ?? '—'}</td>
@@ -231,7 +238,8 @@ function Button({
   variant?: 'default' | 'accent' | 'danger'
 }) {
   const styles = {
-    default: 'bg-surface-overlay text-fg border-border hover:border-border-strong',
+    default:
+      'bg-surface-overlay text-fg border-border hover:border-border-strong',
     accent: 'bg-accent text-accent-fg border-accent hover:bg-accent-hover',
     danger: 'bg-surface-overlay text-danger border-border hover:border-danger',
   }[variant]

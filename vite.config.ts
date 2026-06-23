@@ -1,4 +1,10 @@
-import { createReadStream, existsSync, statSync } from 'node:fs'
+import {
+  copyFileSync,
+  createReadStream,
+  existsSync,
+  mkdirSync,
+  statSync,
+} from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import type { Connect, Plugin } from 'vite'
@@ -40,7 +46,9 @@ function serveEngineArtifacts(): Plugin {
     // what make the pthread workers isolate).
     res.setHeader(
       'Cache-Control',
-      name.endsWith('.wasm') ? 'public, max-age=31536000, immutable' : 'no-cache',
+      name.endsWith('.wasm')
+        ? 'public, max-age=31536000, immutable'
+        : 'no-cache',
     )
     // CRITICAL: this middleware pipes its own response, bypassing Vite's global
     // server.headers. simc.js is re-loaded as the pthread worker script, and those
@@ -61,6 +69,26 @@ function serveEngineArtifacts(): Plugin {
     },
     configurePreviewServer(s) {
       s.middlewares.use(middleware)
+    },
+    // Vendor the ~80 KB ES6 glue same-origin into the production build at
+    // /engine/<tag>/simc.js. It MUST be same-origin (the engine re-loads it as the
+    // em-pthread worker script — WEB_UI_PLAN §3.1), and it's well under the Pages
+    // 25 MiB limit. The 107 MB simc.wasm is deliberately NOT emitted here — it's
+    // served cross-origin from R2 (set VITE_ENGINE_WASM_URL). See docs/DEPLOY.md.
+    writeBundle(options) {
+      const outDir =
+        options.dir ?? fileURLToPath(new URL('./dist', import.meta.url))
+      const src = join(ENGINE_CACHE, 'simc.js')
+      if (!existsSync(src)) {
+        this.warn(
+          `engine glue not found at ${src} — run "node scripts/fetch-engine.mjs" ` +
+            `before building, or prod will 404 on /engine/${ENGINE_TAG}/simc.js`,
+        )
+        return
+      }
+      const destDir = join(outDir, 'engine', ENGINE_TAG)
+      mkdirSync(destDir, { recursive: true })
+      copyFileSync(src, join(destDir, 'simc.js'))
     },
   }
 }

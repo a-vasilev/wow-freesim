@@ -1,12 +1,21 @@
+import type { ReactNode } from 'react'
 import type { SimReport } from '@/engine'
 import { AbilityBreakdown } from './AbilityBreakdown'
+import { DamageTimeline } from './DamageTimeline'
 import { DistributionHistogram } from './DistributionHistogram'
 import { DpsHeadline } from './DpsHeadline'
 import { UptimeGrid } from './UptimeGrid'
 
 /** The report screen body (WEB_UI_PLAN §6.4), built to report.html minus the
- *  Stat Scaling block (deferred to Phase 4). */
-export function ReportView({ report }: { report: SimReport }) {
+ *  Stat Scaling block (deferred to Phase 4). `actions` injects extra buttons into
+ *  the action row (e.g. Save to history) without coupling report → history. */
+export function ReportView({
+  report,
+  actions,
+}: {
+  report: SimReport
+  actions?: ReactNode
+}) {
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-10">
       <CharacterIdentity report={report} />
@@ -14,6 +23,14 @@ export function ReportView({ report }: { report: SimReport }) {
       <section className="border-border-subtle bg-surface-raised flex flex-col gap-6 rounded-lg border p-6">
         <DpsHeadline report={report} />
         <DistributionHistogram dps={report.dps} />
+        {report.damageTimeline && report.damageTimeline.length > 3 && (
+          <div className="border-border-subtle border-t pt-6">
+            <DamageTimeline
+              data={report.damageTimeline}
+              fightLength={report.meta.fightLength}
+            />
+          </div>
+        )}
       </section>
 
       <AbilityBreakdown report={report} />
@@ -21,7 +38,7 @@ export function ReportView({ report }: { report: SimReport }) {
       <UptimeGrid title="Buff uptimes" uptimes={report.buffs} />
       <UptimeGrid title="Debuff uptimes" uptimes={report.debuffs} />
 
-      <ReportActions report={report} />
+      <ReportActions report={report} actions={actions} />
     </div>
   )
 }
@@ -41,7 +58,13 @@ function CharacterIdentity({ report }: { report: SimReport }) {
   )
 }
 
-function ReportActions({ report }: { report: SimReport }) {
+function ReportActions({
+  report,
+  actions,
+}: {
+  report: SimReport
+  actions?: ReactNode
+}) {
   const exportJson = () => {
     const blob = new Blob([JSON.stringify(report, null, 2)], {
       type: 'application/json',
@@ -77,11 +100,10 @@ function ReportActions({ report }: { report: SimReport }) {
     <div className="border-border-subtle text-fg-muted flex flex-wrap items-center gap-3 border-t pt-4 text-sm">
       <ActionButton onClick={copySummary}>Copy report</ActionButton>
       <ActionButton onClick={exportJson}>Export JSON</ActionButton>
-      {report.meta.timestamp && (
-        <span className="text-fg-faint ml-auto font-mono text-xs">
-          {report.meta.simcVersion}
-        </span>
-      )}
+      {actions}
+      <span className="text-fg-faint ml-auto font-mono text-xs">
+        {report.meta.simcVersion}
+      </span>
     </div>
   )
 }

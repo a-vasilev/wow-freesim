@@ -20,7 +20,7 @@
  *    compiled WebAssembly.Module to skip recompile is a later optimization.
  */
 import * as Comlink from 'comlink'
-import { ENGINE_CONFIG } from './config'
+import { ENGINE_CONFIG, ENGINE_THREAD_POOL } from './config'
 import { parseCharacter, parseSimReport } from './json2'
 import {
   type EngineInfo,
@@ -42,6 +42,19 @@ interface SimcModule {
 }
 type CreateSimc = (moduleArg: Record<string, unknown>) => Promise<SimcModule>
 
+// Dev-gated logging: the per-line `[simc]`/`[engine]` trace is invaluable while
+// developing the engine path but pure noise in production. `import.meta.env.DEV`
+// is statically replaced, so these calls (and their string-building) are dropped
+// from the prod bundle. Genuine failures still surface via thrown Errors (with the
+// captured stderr tail) and the kept console.error calls below.
+const DEBUG = import.meta.env?.DEV ?? false
+const dlog = (...args: unknown[]): void => {
+  if (DEBUG) console.log(...args)
+}
+const dwarn = (...args: unknown[]): void => {
+  if (DEBUG) console.warn(...args)
+}
+
 const PROFILE_PATH = '/profile.simc'
 const OUT_PATH = '/out.json'
 
@@ -51,8 +64,8 @@ const OUT_PATH = '/out.json'
 // (that needs a free host event loop) and the run deadlocks after merging. Capping
 // the sim's `threads=` to the pool size keeps every worker pre-allocated → no
 // on-demand spawn → no deadlock. (Raising this needs a larger pool baked into the
-// engine build, or running main off the host thread.)
-const ENGINE_POOL_SIZE = 8
+// engine build, or running main off the host thread.) The constant is shared with
+// the UI (config.ts) so the progress screen can show the thread count.
 
 let createSimc: CreateSimc | null = null
 let wasmBytes: ArrayBuffer | null = null
@@ -68,10 +81,11 @@ let currentOnProgress: ((p: Partial<Progress>) => void) | null = null
 let stderrTail: string[] = []
 
 /** Logical cores the host reports. */
-const hwCores = (): number => Math.max(1, self.navigator?.hardwareConcurrency || 1)
+const hwCores = (): number =>
+  Math.max(1, self.navigator?.hardwareConcurrency || 1)
 
 /** Threads the sim may actually use — capped to the baked pthread pool. */
-const simThreads = (): number => Math.min(ENGINE_POOL_SIZE, hwCores())
+const simThreads = (): number => Math.min(ENGINE_THREAD_POOL, hwCores())
 
 // ── artifact loading (cached) ────────────────────────────────────────────────
 
@@ -179,18 +193,24 @@ async function getModule(): Promise<SimcModule> {
   if (moduleInstance) return moduleInstance
   const create = await loadGlue()
   const binary = await loadWasmBytes()
-  console.log('[engine] instantiating module… (cores', self.navigator?.hardwareConcurrency, 'isolated', self.crossOriginIsolated, ')')
+  dlog(
+    '[engine] instantiating module… (cores',
+    self.navigator?.hardwareConcurrency,
+    'isolated',
+    self.crossOriginIsolated,
+    ')',
+  )
   const t0 = performance.now()
   moduleInstance = await create({
     noInitialRun: true,
     wasmBinary: binary,
     print: (line: string) => {
-      console.log('[simc]', line)
+      dlog('[simc]', line)
       const p = progressFromChunk(line)
       if (p) currentOnProgress?.(p)
     },
     printErr: (line: string) => {
-      console.warn('[simc:err]', line)
+      dwarn('[simc:err]', line)
       stderrTail.push(line)
       if (stderrTail.length > 40) stderrTail.shift()
       const p = progressFromChunk(line)
@@ -198,7 +218,7 @@ async function getModule(): Promise<SimcModule> {
     },
     onAbort: (reason: unknown) => console.error('[engine] onAbort', reason),
   })
-  console.log(`[engine] module ready in ${Math.round(performance.now() - t0)}ms`)
+  dlog(`[engine] module ready in ${Math.round(performance.now() - t0)}ms`)
   return moduleInstance
 }
 
@@ -209,7 +229,7 @@ async function getModule(): Promise<SimcModule> {
  *  worker (→ fresh module) per call and terminates it after. */
 function runOnce(module: SimcModule, args: string[]): string | null {
   if (module.FS.analyzePath(OUT_PATH).exists) module.FS.unlink(OUT_PATH)
-  console.log('[engine] callMain', args)
+  dlog('[engine] callMain', args)
   const t0 = performance.now()
   let code: number | undefined
   try {
@@ -222,7 +242,7 @@ function runOnce(module: SimcModule, args: string[]): string | null {
     }
   }
   const exists = module.FS.analyzePath(OUT_PATH).exists
-  console.log(
+  dlog(
     `[engine] callMain returned ${code} in ${Math.round(performance.now() - t0)}ms · out.json exists=${exists}`,
   )
   return exists ? module.FS.readFile(OUT_PATH, { encoding: 'utf8' }) : null

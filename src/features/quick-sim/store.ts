@@ -18,8 +18,13 @@ export type QuickSimPhase =
   | 'report'
   | 'error'
 
+/** Compose (paste box + parsed preview) vs Advanced (raw `.simc` editor). Both
+ *  feed the same inspect()/run() path; it's a view toggle, not a separate route. */
+export type QuickSimMode = 'compose' | 'advanced'
+
 interface QuickSimState {
   phase: QuickSimPhase
+  mode: QuickSimMode
   profile: string
   options: SimOptions
   character: ParsedCharacter | null
@@ -27,12 +32,19 @@ interface QuickSimState {
   progress: Progress | null
   error: string | null
 
+  setMode: (mode: QuickSimMode) => void
   setProfile: (profile: string) => void
   setOptions: (options: SimOptions) => void
   inspect: () => Promise<void>
   run: () => Promise<void>
   cancel: () => void
   editProfile: () => void
+  /** Load a persisted run (from history) into a viewable report state. */
+  loadRun: (input: {
+    profile: string
+    options: SimOptions
+    report: SimReport
+  }) => void
   reset: () => void
 }
 
@@ -45,6 +57,7 @@ export function looksLikeProfile(text: string): boolean {
 
 export const useQuickSim = create<QuickSimState>((set, get) => ({
   phase: 'empty',
+  mode: 'compose',
   profile: '',
   options: DEFAULT_SIM_OPTIONS,
   character: null,
@@ -52,6 +65,7 @@ export const useQuickSim = create<QuickSimState>((set, get) => ({
   progress: null,
   error: null,
 
+  setMode: (mode) => set({ mode }),
   setProfile: (profile) => set({ profile }),
   setOptions: (options) => set({ options }),
 
@@ -74,7 +88,18 @@ export const useQuickSim = create<QuickSimState>((set, get) => ({
   },
 
   run: async () => {
-    const { profile, options } = get()
+    const { profile, options, phase } = get()
+    // Don't launch a second worker over an in-flight run (would orphan the first).
+    if (phase === 'running') return
+    // Guard an empty/whitespace profile here so we surface a clear message instead
+    // of booting the engine to write an empty .simc that simc rejects opaquely.
+    if (!profile.trim()) {
+      set({
+        phase: 'error',
+        error: 'No profile to simulate — paste a /simc string first.',
+      })
+      return
+    }
     set({ phase: 'running', error: null, report: null, progress: null })
     try {
       const report = await getEngine().run({ profile, options }, (progress) =>
@@ -93,6 +118,18 @@ export const useQuickSim = create<QuickSimState>((set, get) => ({
   cancel: () => getEngine().cancel(),
 
   editProfile: () => set({ phase: get().character ? 'ready' : 'empty' }),
+
+  loadRun: ({ profile, options, report }) =>
+    set({
+      phase: 'report',
+      mode: 'compose',
+      profile,
+      options,
+      report,
+      character: null,
+      progress: null,
+      error: null,
+    }),
 
   reset: () =>
     set({

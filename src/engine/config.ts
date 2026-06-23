@@ -25,6 +25,19 @@ export interface EngineConfig {
 
 const TAG = 'v1205.01'
 
+/**
+ * The pthread pool size baked into the engine glue (PTHREAD_POOL_SIZE=8). The sim
+ * caps `threads=` to this so every worker is pre-allocated — see the deadlock note
+ * in wasm-worker.ts. Surfaced here so the UI can show a thread/core line without
+ * booting the 107 MB binary. Raising it requires a larger pool in the engine build.
+ */
+export const ENGINE_THREAD_POOL = 8
+
+/** Threads the sim will actually use on this host (capped to the pool). */
+export function engineThreadCount(cores: number): number {
+  return Math.min(ENGINE_THREAD_POOL, Math.max(1, cores))
+}
+
 // Dev/default: same-origin paths served from .engine-cache by the Vite middleware.
 // `VITE_ENGINE_WASM_URL` overrides the wasm origin (e.g. the R2 custom domain).
 const wasmOverride = import.meta.env?.VITE_ENGINE_WASM_URL as string | undefined

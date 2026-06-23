@@ -29,6 +29,7 @@
     "@visx/shape": "^4.0.0",
     "codemirror": "^6.0.2",
     "comlink": "^4.4.2",
+    "dexie": "^4.4.4",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "zod": "^4.4.3",

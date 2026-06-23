@@ -10,7 +10,7 @@ function StyleguidePage() {
   const theme = useThemeStore((s) => s.theme)
 
   return (
-    <div className="flex flex-col gap-12">
+    <div className="flex flex-col gap-12 px-7 py-6">
       <header className="flex flex-col gap-2">
         <h1 className="text-fg font-display text-3xl font-semibold">
           Styleguide

@@ -1,0 +1,98 @@
+# Strategy A: automated engine version bump + R2 upload + PR.
+#
+# A new simc-wasm release flows in without anyone hand-editing this repo:
+#   1. The simc fork's release CI fires a `repository_dispatch` (type: engine-release)
+#      with the new tag, OR you trigger this manually (workflow_dispatch).
+#   2. We run scripts/bump-engine.mjs: vendor the same-origin simc.js glue +
+#      rewrite the pin (tag/sha256) in src/engine/config.ts.
+#   3. We download the 107 MB simc.wasm from the release and push it to R2 at
+#      <tag>/simc.wasm (immutable cache, application/wasm). The app fetches this
+#      cross-origin from the R2 custom domain in CORS mode.
+#   4. We open a PR. Merging it triggers the Cloudflare Pages Git deploy.
+#
+# The PR (not a direct push) keeps the sha256 + a Pages preview build in the review
+# loop — the wasm upload is idempotent, so it's safe even if the PR is re-run.
+#
+# Required repo secrets/vars (Settings → Secrets and variables → Actions):
+#   secret CLOUDFLARE_API_TOKEN   — token with "R2 Storage: Edit" on the account
+#   secret CLOUDFLARE_ACCOUNT_ID  — Cloudflare account id
+#   var    R2_ENGINE_BUCKET       — the R2 bucket name (e.g. wow-freesim-engine)
+
+name: engine-bump
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'simc-wasm release tag (e.g. v1206.02)'
+        required: true
+  repository_dispatch:
+    types: [engine-release]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.inputs.tag || github.event.client_payload.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate tag
+        run: |
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Missing/invalid tag: '$TAG' (expected vNNNN.NN)"; exit 1
+          fi
+
+      # Vendor the glue + rewrite the pin (tag/scVersion/sha256) in config.ts.
+      - name: Bump engine pin
+        run: node scripts/bump-engine.mjs "$TAG"
+
+      # Push the 107 MB wasm to R2. We fetch the bytes, then bump-engine.mjs has
+      # already recorded the expected sha256 in config.ts; verify before upload so
+      # a bad release never reaches R2.
+      - name: Upload simc.wasm to R2
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BUCKET: ${{ vars.R2_ENGINE_BUCKET }}
+        run: |
+          set -euo pipefail
+          url="https://github.com/a-vasilev/simc-wasm/releases/download/$TAG/simc.wasm"
+          curl -fsSL "$url" -o simc.wasm
+          want=$(grep -oE "wasm: '[0-9a-f]{64}'" src/engine/config.ts | grep -oE '[0-9a-f]{64}')
+          got=$(sha256sum simc.wasm | cut -d' ' -f1)
+          if [[ "$got" != "$want" ]]; then
+            echo "::error::simc.wasm sha256 mismatch (got $got, want $want)"; exit 1
+          fi
+          npx --yes wrangler@4 r2 object put \
+            "$BUCKET/$TAG/simc.wasm" \
+            --file simc.wasm --remote \
+            --content-type application/wasm \
+            --cache-control "public, max-age=31536000, immutable"
+          rm -f simc.wasm
+
+      - name: Open PR
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: engine-bump/${{ env.TAG }}
+          title: 'Bump engine to ${{ env.TAG }}'
+          commit-message: 'Bump engine to ${{ env.TAG }}'
+          body: |
+            Automated engine bump to **${{ env.TAG }}**.
+
+            - Vendored same-origin `public/engine/${{ env.TAG }}/simc.js`
+            - Rewrote the pin (tag/scVersion/sha256) in `src/engine/config.ts`
+            - Uploaded `simc.wasm` to R2 at `${{ env.TAG }}/simc.wasm` (sha256 verified)
+
+            Merging deploys via the Cloudflare Pages Git integration.
+          add-paths: |
+            public/engine
+            src/engine/config.ts

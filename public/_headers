@@ -6,3 +6,10 @@
 /*
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Embedder-Policy: credentialless
+
+# The vendored ES6 glue (simc.js) is immutable per release tag (the tag is in the
+# path). It inherits COOP/COEP from /* above; same-origin assets need no CORP under
+# credentialless. The 107 MB simc.wasm is served cross-origin from R2 — see
+# docs/DEPLOY.md (R2 custom domain + CORS), not from here.
+/engine/*
+  Cache-Control: public, max-age=31536000, immutable

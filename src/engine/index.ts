@@ -7,7 +7,7 @@ export {
   type EngineKind,
 } from './factory'
 export { WasmEngine, EngineCancelledError } from './WasmEngine'
-export { ENGINE_CONFIG } from './config'
+export { ENGINE_CONFIG, ENGINE_THREAD_POOL, engineThreadCount } from './config'
 export { parseCharacter, parseSimReport, parseEncodedItem } from './json2'
 export {
   FIGHT_STYLES,
