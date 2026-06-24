@@ -7,7 +7,7 @@ import { Link } from '@tanstack/react-router'
  * (= --green-400, the on-token "gear gain" green), so it stays on-token. The
  * wordmark's leading "i" dot is replaced by a gold diamond. Links to the app root.
  */
-export function Brand() {
+export function Brand({ markOnly = false }: { markOnly?: boolean }) {
   return (
     <Link
       to="/"
@@ -15,7 +15,7 @@ export function Brand() {
       aria-label="iLvl — home"
     >
       <UpgradeMark />
-      <Wordmark />
+      {!markOnly && <Wordmark />}
     </Link>
   )
 }

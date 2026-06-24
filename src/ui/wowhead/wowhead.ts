@@ -11,17 +11,20 @@
 import { useEffect } from 'react'
 import type { GearItem } from '@/engine'
 
-interface WowheadPower {
-  refreshLinks?: () => void
+interface WowheadGlobal {
+  refreshLinks?: (force?: boolean) => void
 }
 declare global {
   interface Window {
     whTooltips?: Record<string, boolean>
-    $WowheadPower?: WowheadPower
+    WH?: WowheadGlobal
   }
 }
 
-const SCRIPT_SRC = 'https://wow.zamimg.com/js/tooltips.js'
+// The official Power script (https://www.wowhead.com/tooltips). Exposes `window.WH`
+// with `refreshLinks()`, reads config from `window.whTooltips`. (The previous
+// `js/tooltips.js` was the legacy widget.)
+const SCRIPT_SRC = 'https://wow.zamimg.com/widgets/power.js'
 let loadPromise: Promise<void> | null = null
 
 /** Inject the Power script once (idempotent). Resolves when it has loaded. */
@@ -29,11 +32,13 @@ export function loadWowhead(): Promise<void> {
   if (loadPromise) return loadPromise
   loadPromise = new Promise<void>((resolve, reject) => {
     if (typeof document === 'undefined') return resolve()
-    // Config must exist before the script runs: iconize + color + rename links.
+    // Config must exist before the script runs. We enable all three globally so
+    // plain WowheadItem/WowheadSpell links elsewhere (ability breakdown, talents)
+    // icon+color+rename as before; ItemCell opts individual links out per-link via
+    // data-wh-rename-link / data-wh-iconize-link.
     window.whTooltips = {
       colorLinks: true,
       iconizeLinks: true,
-      iconizeLinks2: true,
       renameLinks: true,
     }
     const existing = document.querySelector<HTMLScriptElement>(
@@ -47,15 +52,28 @@ export function loadWowhead(): Promise<void> {
     // which is exactly why we use credentialless not require-corp. Do NOT set
     // crossOrigin: that forces a CORS request, and Wowhead sends no ACAO → blocked.
     script.onload = () => resolve()
-    script.onerror = () => reject(new Error('Failed to load Wowhead tooltips.js'))
+    script.onerror = () => reject(new Error('Failed to load Wowhead power.js'))
     document.head.appendChild(script)
   })
   return loadPromise
 }
 
-/** Re-scan the DOM after React adds/changes Wowhead links. Safe to over-call. */
+let refreshScheduled = false
+
+/**
+ * Re-scan the DOM after React adds/changes Wowhead links. Debounced to one
+ * `refreshLinks()` per frame so a screen full of ItemCells coalesces into a
+ * single pass (refreshLinks walks every `document.links` entry — O(n) each call).
+ */
 export function refreshWowhead(): void {
-  window.$WowheadPower?.refreshLinks?.()
+  if (refreshScheduled) return
+  refreshScheduled = true
+  const run = () => {
+    refreshScheduled = false
+    window.WH?.refreshLinks?.()
+  }
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run)
+  else setTimeout(run, 0)
 }
 
 /** Ensure the Power script is loaded, then re-scan whenever `deps` change. */

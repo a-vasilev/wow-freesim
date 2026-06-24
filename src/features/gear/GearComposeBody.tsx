@@ -1,20 +1,13 @@
+import { useState } from 'react'
 import * as Collapsible from '@radix-ui/react-collapsible'
-import { WowheadAttribution, WowheadItem } from '@/ui/wowhead'
-import { useWowhead } from '@/ui/wowhead/wowhead'
+import { ItemCell } from '@/ui/item/ItemCell'
+import { WowheadAttribution } from '@/ui/wowhead'
 import sampleProfile from '@/engine/fixtures/sample-profile.simc?raw'
 import { MAX_COMBOS, WARN_COMBOS, comboCount, type Selection } from './combos'
-import type { CandidateItem, GearSlot } from './gearModel'
+import type { GearSlot } from './gearModel'
 import { useTopGear } from './store'
 
-function humanize(name?: string): string {
-  if (!name) return 'Item'
-  return name
-    .split('_')
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ')
-}
-
-/** Compose-screen body: empty paste box, or the candidate picker (§7 / 2a). */
+/** Compose-screen body: empty paste box, or the two-pane picker (§7 / 2a). */
 export function GearComposeBody() {
   const { phase, model } = useTopGear()
   if (model && (phase === 'ready' || phase === 'inspecting')) {
@@ -66,11 +59,20 @@ function EmptyPaste() {
   )
 }
 
+/** First slot that has alternatives to consider, else the first slot. */
+function defaultActiveKey(slots: GearSlot[]): string {
+  return (slots.find((s) => s.candidates.length > 1) ?? slots[0])?.key ?? ''
+}
+
 function CandidatePicker() {
   const { model, selection, profile, setProfile, error, droppedItems } =
     useTopGear()
-  useWowhead([model, selection])
+  const [activeKey, setActiveKey] = useState('')
   if (!model) return null
+
+  const slots = model.slots
+  const resolvedKey = activeKey || defaultActiveKey(slots)
+  const active = slots.find((s) => s.key === resolvedKey) ?? slots[0]
 
   return (
     <div className="flex flex-col gap-5">
@@ -93,17 +95,6 @@ function CandidatePicker() {
 
       {error && <span className="text-danger text-sm">{error}</span>}
 
-      <div className="flex flex-col gap-2">
-        <h2 className="text-fg font-display text-sm font-semibold">
-          Choose items to consider
-        </h2>
-        <p className="text-fg-muted text-sm">
-          Each slot starts on your equipped item. Add alternatives (from your
-          bags &amp; bank) and Top Gear sims every combination to find the best
-          set.
-        </p>
-      </div>
-
       {droppedItems.length > 0 && (
         <p className="text-fg-faint text-xs">
           Hid {droppedItems.length}{' '}
@@ -112,14 +103,16 @@ function CandidatePicker() {
         </p>
       )}
 
-      <div className="border-border-subtle divide-border-subtle bg-surface-raised flex flex-col divide-y rounded-lg border">
-        {model.slots.map((slot) => (
-          <SlotRow
-            key={slot.key}
-            slot={slot}
-            selected={selection[slot.key] ?? []}
-          />
-        ))}
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
+        <EquippedPane
+          slots={slots}
+          selection={selection}
+          activeKey={active?.key}
+          onSelect={setActiveKey}
+        />
+        {active && (
+          <CandidatePane slot={active} selected={selection[active.key] ?? []} />
+        )}
       </div>
 
       <WowheadAttribution className="text-fg-faint text-xs" />
@@ -127,63 +120,98 @@ function CandidatePicker() {
   )
 }
 
-function SlotRow({ slot, selected }: { slot: GearSlot; selected: string[] }) {
+/** Left pane — the equipped paperdoll. Click a slot to edit its options. */
+function EquippedPane({
+  slots,
+  selection,
+  activeKey,
+  onSelect,
+}: {
+  slots: GearSlot[]
+  selection: Selection
+  activeKey?: string
+  onSelect: (key: string) => void
+}) {
+  return (
+    <section className="border-border-subtle bg-surface-raised overflow-hidden rounded-lg border lg:w-80 lg:shrink-0">
+      <header className="border-border-subtle border-b px-4 py-3">
+        <span className="text-fg-muted text-xs font-semibold tracking-widest uppercase">
+          Equipped
+        </span>
+      </header>
+      <div className="flex flex-col gap-1.5 p-2">
+        {slots.map((slot) => {
+          const equipped = slot.candidates.find(
+            (c) => c.uid === slot.equippedUid,
+          )
+          if (!equipped) return null
+          const picks = selection[slot.key] ?? []
+          const varied =
+            picks.length > 1 ||
+            (picks.length === 1 && picks[0] !== slot.equippedUid)
+          return (
+            <ItemCell
+              key={slot.key}
+              item={equipped.item}
+              label={slot.label}
+              interactive
+              selected={slot.key === activeKey}
+              onToggle={() => onSelect(slot.key)}
+              trailing={varied ? <OptionCount n={picks.length} /> : undefined}
+            />
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+/** Right pane — every candidate for the active slot; multi-select to consider. */
+function CandidatePane({
+  slot,
+  selected,
+}: {
+  slot: GearSlot
+  selected: string[]
+}) {
   const toggleCandidate = useTopGear((s) => s.toggleCandidate)
   return (
-    <div className="flex flex-col gap-2 p-3 sm:flex-row sm:items-start sm:gap-4">
-      <div className="text-fg-subtle w-24 shrink-0 pt-1.5 text-xs font-semibold tracking-wide uppercase">
-        {slot.label}
-      </div>
-      <div className="flex flex-1 flex-wrap gap-2">
+    <section className="border-border-subtle bg-surface-raised min-w-0 overflow-hidden rounded-lg border lg:flex-1">
+      <header className="border-border-subtle border-b px-4 py-3">
+        <div className="flex items-baseline justify-between gap-2">
+          <h2 className="text-fg font-display text-sm font-semibold">
+            {slot.label}
+          </h2>
+          <span className="text-fg-faint text-xs tabular-nums">
+            {slot.candidates.length}{' '}
+            {slot.candidates.length === 1 ? 'option' : 'options'}
+          </span>
+        </div>
+        <p className="text-fg-muted mt-1 text-xs">
+          Select every item Top Gear should try in this slot.
+        </p>
+      </header>
+      <div className="flex flex-col gap-1.5 p-2">
         {slot.candidates.map((cand) => (
-          <CandidateChip
+          <ItemCell
             key={cand.uid}
-            cand={cand}
-            equipped={cand.uid === slot.equippedUid}
+            item={cand.item}
+            interactive
             selected={selected.includes(cand.uid)}
+            equipped={cand.uid === slot.equippedUid}
             onToggle={() => toggleCandidate(slot.key, cand.uid)}
           />
         ))}
       </div>
-    </div>
+    </section>
   )
 }
 
-function CandidateChip({
-  cand,
-  equipped,
-  selected,
-  onToggle,
-}: {
-  cand: CandidateItem
-  equipped: boolean
-  selected: boolean
-  onToggle: () => void
-}) {
+/** Small count chip on a varied slot row (how many items it's trying). */
+function OptionCount({ n }: { n: number }) {
   return (
-    <span className="inline-flex items-center">
-      {/* The anchor is the toggle AND the Wowhead tooltip/icon host. preventDefault
-          stops navigation; Wowhead's renameLinks fills in the real item name. */}
-      <WowheadItem
-        item={cand.item}
-        aria-pressed={selected}
-        onClick={(e) => {
-          e.preventDefault()
-          onToggle()
-        }}
-        className={`flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-sm transition-colors focus-visible:outline-none ${
-          selected
-            ? 'border-accent bg-accent-subtle text-fg'
-            : 'border-border-subtle text-fg-muted hover:text-fg hover:border-border opacity-70'
-        }`}
-      >
-        {humanize(cand.item.name)}
-        {equipped && (
-          <span className="text-fg-faint text-xs font-semibold tracking-wide uppercase">
-            · Equipped
-          </span>
-        )}
-      </WowheadItem>
+    <span className="bg-accent-subtle text-accent rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums">
+      {n}
     </span>
   )
 }
