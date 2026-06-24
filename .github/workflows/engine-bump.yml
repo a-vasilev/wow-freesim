@@ -65,8 +65,9 @@ jobs:
 
       - name: Validate tag
         run: |
-          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Missing/invalid tag: '$TAG' (expected vNNNN.NN)"; exit 1
+          # vNNNN.NN with an optional re-release/hotfix suffix (e.g. v1205.01-2).
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "::error::Missing/invalid tag: '$TAG' (expected vNNNN.NN or vNNNN.NN-N)"; exit 1
           fi
 
       # Vendor the glue + rewrite the pin (tag/scVersion/sha256) in config.ts.

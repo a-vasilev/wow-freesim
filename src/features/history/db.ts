@@ -37,7 +37,7 @@ class HistoryDb extends Dexie {
   payloads!: Table<HistoryRunPayload, string>
 
   constructor() {
-    super('freesim-history')
+    super('ilvl-history')
     this.version(1).stores({
       // Only indexed fields are listed; the rest are stored unindexed.
       runs: 'id, createdAt',

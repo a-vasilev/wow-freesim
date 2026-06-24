@@ -23,6 +23,6 @@ export const useThemeStore = create<ThemeState>()(
       theme: DEFAULT_THEME,
       setTheme: (theme) => set({ theme }),
     }),
-    { name: 'wow-freesim:theme' },
+    { name: 'ilvl:theme' },
   ),
 )

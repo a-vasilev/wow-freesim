@@ -147,5 +147,7 @@ The default `GITHUB_TOKEN` **cannot** reach another repo — a separate PAT is
 required. The tag must be `vNNNN.NN`; the workflow re-validates it and aborts on a
 bad value, so a malformed release never reaches R2.
 
-> The glue **must** stay same-origin, so it ships vendored in `public/engine/<tag>/`
-> (the bump script prunes older tags). Only the wasm goes to R2.
+> The glue **must** stay same-origin, so it ships vendored in `public/engine/<tag>/`;
+> the bump script prunes older `public/engine/v*` dirs so the repo pins exactly one
+> tag. This only touches the local glue dirs — the 107 MB **wasm objects in R2 are
+> never auto-pruned**; delete stale ones by hand (`wrangler r2 object delete`).

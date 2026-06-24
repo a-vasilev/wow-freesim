@@ -28,9 +28,11 @@ const ROOT = resolve(here, '..')
 const PUBLIC_ENGINE = join(ROOT, 'public', 'engine')
 const CONFIG_PATH = join(ROOT, 'src', 'engine', 'config.ts')
 
+// vNNNN.NN with an optional re-release/hotfix suffix (e.g. v1205.01-2).
+const TAG_RE = /^v\d+\.\d+(-[0-9A-Za-z.]+)?$/
 const tag = process.argv[2]
-if (!tag || !/^v\d+\.\d+$/.test(tag)) {
-  console.error('usage: node scripts/bump-engine.mjs <tag>   (e.g. v1206.02)')
+if (!tag || !TAG_RE.test(tag)) {
+  console.error('usage: node scripts/bump-engine.mjs <tag>   (e.g. v1206.02 or v1206.02-2)')
   process.exit(1)
 }
 
@@ -69,7 +71,7 @@ if (gotGlue !== want.glue) {
 }
 if (existsSync(PUBLIC_ENGINE)) {
   for (const d of readdirSync(PUBLIC_ENGINE)) {
-    if (/^v\d+\.\d+$/.test(d) && d !== tag) {
+    if (TAG_RE.test(d) && d !== tag) {
       rmSync(join(PUBLIC_ENGINE, d), { recursive: true, force: true })
       console.log(`[bump] pruned stale public/engine/${d}`)
     }

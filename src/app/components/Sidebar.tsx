@@ -6,7 +6,6 @@ import {
   GearIcon,
   HistoryIcon,
   QuickSimIcon,
-  SettingsIcon,
 } from '@/ui/icons'
 import { Brand } from './Brand'
 
@@ -54,13 +53,6 @@ export function Sidebar() {
 
       <div className="border-border-subtle flex items-center gap-2 border-t px-4 py-3.5">
         <EngineStatusChip />
-        <Link
-          to="/styleguide"
-          aria-label="Styleguide"
-          className="text-fg-faint hover:text-fg-muted hover:bg-surface-overlay focus-visible:ring-focus ml-auto flex size-7 items-center justify-center rounded-md transition-colors outline-none focus-visible:ring-2"
-        >
-          <SettingsIcon className="size-3.5" />
-        </Link>
       </div>
     </aside>
   )

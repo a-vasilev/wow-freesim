@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { ContentHeader } from '@/app/components/ContentHeader'
 import {
   hardwareConcurrency,
@@ -17,7 +17,7 @@ function HomePage() {
       <ContentHeader title="Home" />
       <section className="flex flex-col gap-8 px-7 py-6">
         <div className="flex flex-col gap-4">
-          <h1 className="text-fg text-3xl font-semibold">wow-freesim</h1>
+          <h1 className="text-fg text-3xl font-semibold">iLvl</h1>
           <p className="text-fg-muted max-w-2xl">
             Browser-based SimulationCraft — sims run client-side on your own CPU
             cores via WebAssembly, no server farm. This is the Phase&nbsp;U0
@@ -35,17 +35,6 @@ function HomePage() {
             {hardwareConcurrency()}
           </StatusCell>
         </dl>
-
-        <p className="text-fg-muted text-sm">
-          Explore the token surface on the{' '}
-          <Link
-            to="/styleguide"
-            className="text-accent hover:text-accent-hover"
-          >
-            styleguide
-          </Link>
-          .
-        </p>
       </section>
     </>
   )

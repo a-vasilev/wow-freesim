@@ -83,14 +83,3 @@ export function SettingsIcon(props: IconProps) {
     </Icon>
   )
 }
-
-/** Styleguide — palette swatches. */
-export function SwatchIcon(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <rect x="2.5" y="2.5" width="4.5" height="11" rx="1" />
-      <path d="M7 9.5l3.2-3.2a1 1 0 0 0 0-1.4L9 3.5a1 1 0 0 0-1.4 0L7 4.1" />
-      <path d="M4.75 11.25h.01" />
-    </Icon>
-  )
-}
