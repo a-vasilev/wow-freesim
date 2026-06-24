@@ -61,10 +61,13 @@ Connect the Git repo. Build settings:
 - **Output directory:** `dist`
 - `public/_headers` is copied into `dist/` automatically (COOP/COEP site-wide).
 - **Environment variable (Production):**
-  `VITE_ENGINE_WASM_URL = https://engine.yourdomain.com/v1205.01/simc.wasm`
-  (read by `src/engine/config.ts`; unset in dev, where the Vite middleware serves
-  the wasm from `.engine-cache/`). The bump workflow updates the tag in this URL —
-  keep the env var's tag in sync, or point it at a `/latest/` alias you repoint.
+  `VITE_ENGINE_WASM_URL = https://engine.yourdomain.com` — just the R2 custom-domain
+  **origin** (no tag, no filename). `src/engine/config.ts` appends `/<tag>/simc.wasm`
+  for the pinned tag, so this var is set **once and never changes** across engine
+  bumps — that's what makes the automated bump (below) hands-off. Unset in dev, where
+  the Vite middleware serves the wasm from `.engine-cache/`. (A full tagged
+  `…/<tag>/simc.wasm` URL is still honored for back-compat, but then you'd have to
+  repoint it every bump — prefer the bare origin.)
 
 ### 4. Verify after deploy
 
@@ -92,14 +95,53 @@ wrangler r2 object put wow-freesim-engine/v1206.02/simc.wasm \
   --cache-control "public, max-age=31536000, immutable"
 ```
 
-Review the diff, commit, update `VITE_ENGINE_WASM_URL`'s tag, and let Pages deploy.
+Review the diff, commit, and let Pages deploy. No env-var change is needed —
+`VITE_ENGINE_WASM_URL` is the tag-agnostic R2 origin and `config.ts` builds the
+per-tag path from the new pin.
 
 **Automated:** [`.github/workflows/engine-bump.yml`](../.github/workflows/engine-bump.yml)
-does all of the above and opens a PR. Trigger it manually (workflow_dispatch with a
-tag) or have the simc fork's release CI fire a `repository_dispatch`
-(`type: engine-release`, `client_payload.tag`). Requires repo secrets
-`CLOUDFLARE_API_TOKEN` (R2 Storage: Edit) + `CLOUDFLARE_ACCOUNT_ID` and the var
-`R2_ENGINE_BUCKET`. Merging the PR deploys.
+uploads the wasm to R2 and **commits the glue + pin straight to `main`**. Cloudflare
+Pages' Git integration sees the push and redeploys — there is no deploy step on our
+side. Trigger it manually (workflow_dispatch with a tag) or have the simc fork's
+release CI fire a `repository_dispatch` (`type: engine-release`,
+`client_payload.tag`).
+
+The wasm lands in R2 *before* the commit, so the redeploy's new pin always resolves
+to bytes that already exist. The commit uses the default `GITHUB_TOKEN`, which by
+design does **not** re-trigger Actions workflows — so a wrangler-based deploy workflow
+(if you keep one) won't double-fire; only Cloudflare's external Git webhook redeploys.
+
+Prerequisites (one-time):
+
+- **Secrets** (web repo → Settings → Secrets and variables → Actions → *Secrets*):
+  `CLOUDFLARE_API_TOKEN` (needs **"R2 Storage: Edit"**) and `CLOUDFLARE_ACCOUNT_ID`.
+- **Variable** (same page → *Variables*): `R2_ENGINE_BUCKET` = `wow-freesim-engine`.
+- **Branch protection:** the workflow pushes to `main` with `GITHUB_TOKEN`. If `main`
+  is protected, allow GitHub Actions (or the `github-actions[bot]`) to bypass the
+  rule, or the push step will fail.
+
+### Auto-trigger from the simc fork (optional)
+
+For a release in the `simc-wasm` fork to bump this repo automatically, add a job to
+the **fork's** release workflow that fires a `repository_dispatch` here. It needs a
+**PAT** (fine-grained, scoped to `wow-freesim` with *Contents: read & write* and
+*Metadata: read*, or a classic token with `repo`) stored as a secret in the **fork**
+(e.g. `WEB_REPO_DISPATCH_TOKEN`):
+
+```yaml
+# In the simc-wasm fork's release workflow, after the release is published:
+- name: Notify wow-freesim to bump the engine
+  env:
+    GH_TOKEN: ${{ secrets.WEB_REPO_DISPATCH_TOKEN }}
+  run: |
+    gh api repos/<owner>/wow-freesim/dispatches \
+      -f event_type=engine-release \
+      -F client_payload[tag]="${{ github.event.release.tag_name }}"
+```
+
+The default `GITHUB_TOKEN` **cannot** reach another repo — a separate PAT is
+required. The tag must be `vNNNN.NN`; the workflow re-validates it and aborts on a
+bad value, so a malformed release never reaches R2.
 
 > The glue **must** stay same-origin, so it ships vendored in `public/engine/<tag>/`
 > (the bump script prunes older tags). Only the wasm goes to R2.

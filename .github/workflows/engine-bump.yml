@@ -1,4 +1,4 @@
-# Strategy A: automated engine version bump + R2 upload + PR.
+# Strategy A: automated engine version bump + R2 upload + commit to main.
 #
 # A new simc-wasm release flows in without anyone hand-editing this repo:
 #   1. The simc fork's release CI fires a `repository_dispatch` (type: engine-release)
@@ -8,10 +8,14 @@
 #   3. We download the 107 MB simc.wasm from the release and push it to R2 at
 #      <tag>/simc.wasm (immutable cache, application/wasm). The app fetches this
 #      cross-origin from the R2 custom domain in CORS mode.
-#   4. We open a PR. Merging it triggers the Cloudflare Pages Git deploy.
+#   4. We commit the glue + pin straight to `main`. Cloudflare Pages' Git integration
+#      picks up the push and redeploys automatically — no deploy step on our side.
 #
-# The PR (not a direct push) keeps the sha256 + a Pages preview build in the review
-# loop — the wasm upload is idempotent, so it's safe even if the PR is re-run.
+# Order matters: the wasm is in R2 (step 3) BEFORE the commit lands (step 4), so the
+# redeploy's new pin always resolves to bytes that already exist. The commit uses the
+# default GITHUB_TOKEN, which by design does NOT re-trigger Actions workflows (so a
+# wrangler-based deploy.yml, if present, won't double-fire); Cloudflare's external Git
+# webhook fires regardless of the token.
 #
 # Required repo secrets/vars (Settings → Secrets and variables → Actions):
 #   secret CLOUDFLARE_API_TOKEN   — token with "R2 Storage: Edit" on the account
@@ -31,7 +35,6 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 jobs:
   bump:
@@ -39,7 +42,11 @@ jobs:
     env:
       TAG: ${{ github.event.inputs.tag || github.event.client_payload.tag }}
     steps:
+      # Always operate on main: bump-engine rewrites the pin against main's content
+      # and the final step commits straight back to it.
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - uses: actions/setup-node@v4
         with:
@@ -79,20 +86,18 @@ jobs:
             --cache-control "public, max-age=31536000, immutable"
           rm -f simc.wasm
 
-      - name: Open PR
-        uses: peter-evans/create-pull-request@v7
-        with:
-          branch: engine-bump/${{ env.TAG }}
-          title: 'Bump engine to ${{ env.TAG }}'
-          commit-message: 'Bump engine to ${{ env.TAG }}'
-          body: |
-            Automated engine bump to **${{ env.TAG }}**.
-
-            - Vendored same-origin `public/engine/${{ env.TAG }}/simc.js`
-            - Rewrote the pin (tag/scVersion/sha256) in `src/engine/config.ts`
-            - Uploaded `simc.wasm` to R2 at `${{ env.TAG }}/simc.wasm` (sha256 verified)
-
-            Merging deploys via the Cloudflare Pages Git integration.
-          add-paths: |
-            public/engine
-            src/engine/config.ts
+      # Commit the vendored glue + rewritten pin straight to main. The push uses the
+      # checkout's default GITHUB_TOKEN credentials; Cloudflare Pages' Git integration
+      # sees the push and redeploys. No-op if re-bumping the already-pinned tag.
+      - name: Commit to main
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/engine src/engine/config.ts
+          if git diff --cached --quiet; then
+            echo "No changes to commit — already pinned to $TAG."
+            exit 0
+          fi
+          git commit -m "Bump engine to $TAG"
+          git push origin HEAD:main

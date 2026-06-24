@@ -58,11 +58,11 @@ unavailable.
 ## Deployment (Cloudflare Pages)
 
 CI is in [`.github/workflows`](./.github/workflows): `ci.yml` runs
-lint/typecheck/build on every push and PR; `deploy.yml` publishes to Cloudflare
-Pages. Before the deploy workflow works you must:
-
-1. Create a Cloudflare Pages project named `wow-freesim` (direct upload / wrangler).
-2. Add repo secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+lint/typecheck/build on every push and PR; `engine-bump.yml` automates engine
+version bumps (see [`docs/HOSTING.md`](./docs/HOSTING.md)). Deploys are handled by
+**Cloudflare Pages' Git integration** — connect the repo to a Pages project named
+`wow-freesim` and it builds/publishes on every push to `main` (and previews PRs),
+so there's no deploy workflow in this repo.
 
 ## License
 

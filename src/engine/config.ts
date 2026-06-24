@@ -7,7 +7,8 @@
  *  - `simc.js` MUST be same-origin (pthread workers re-load it as `em-pthread`).
  *  - `simc.wasm` (107 MB) may be remote (fetched once, shared to pthreads).
  * In dev both are served same-origin from `.engine-cache/` by a Vite middleware
- * (see vite.config.ts). In prod, point `wasmBaseUrl` at the R2 custom domain.
+ * (see vite.config.ts). In prod, set `VITE_ENGINE_WASM_URL` to the R2 custom-domain
+ * origin (tag-agnostic — the `/<tag>/simc.wasm` path is appended below).
  */
 export interface EngineConfig {
   tag: string
@@ -39,14 +40,23 @@ export function engineThreadCount(cores: number): number {
 }
 
 // Dev/default: same-origin paths served from .engine-cache by the Vite middleware.
-// `VITE_ENGINE_WASM_URL` overrides the wasm origin (e.g. the R2 custom domain).
-const wasmOverride = import.meta.env?.VITE_ENGINE_WASM_URL as string | undefined
+// `VITE_ENGINE_WASM_URL` points at the R2 custom-domain ORIGIN (e.g.
+// `https://engine.yourdomain.com`); the per-tag path `/${TAG}/simc.wasm` is appended
+// here. Keeping the env var tag-agnostic means it's set ONCE and never touched again
+// across engine bumps — bumping is then a pure repo change (Strategy A, hands-off).
+// A full tagged URL (…/<tag>/simc.wasm) is still honored for backward compatibility.
+const wasmBase = (import.meta.env?.VITE_ENGINE_WASM_URL as string | undefined)?.replace(/\/+$/, '')
+const wasmUrl = wasmBase
+  ? wasmBase.endsWith('.wasm')
+    ? wasmBase
+    : `${wasmBase}/${TAG}/simc.wasm`
+  : `/engine/${TAG}/simc.wasm`
 
 export const ENGINE_CONFIG: EngineConfig = {
   tag: TAG,
   scVersion: '1205-01',
   glueUrl: `/engine/${TAG}/simc.js`,
-  wasmUrl: wasmOverride ?? `/engine/${TAG}/simc.wasm`,
+  wasmUrl,
   sha256: {
     glue: 'd53c56ec678d0bfdd9c564e9cdaa3f354262e1ae204d7b009ce632e799527543',
     wasm: '22329ac81009d0da191cd177925f15adf7baf27b854154de75923862179e7a55',
