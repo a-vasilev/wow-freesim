@@ -11,6 +11,8 @@ import type { SimEngine } from './SimEngine'
 import type {
   EngineInfo,
   ParsedCharacter,
+  ProfilesetInput,
+  ProfilesetReport,
   Progress,
   SimInput,
   SimReport,
@@ -77,13 +79,28 @@ export class WasmEngine implements SimEngine {
   }
 
   run(input: SimInput, onProgress: (p: Progress) => void): Promise<SimReport> {
+    return this.#perform((proxy) =>
+      proxy.run(input, this.#progressProxy(onProgress)),
+    )
+  }
+
+  runProfilesets(
+    input: ProfilesetInput,
+    onProgress: (p: Progress) => void,
+  ): Promise<ProfilesetReport> {
+    return this.#perform((proxy) =>
+      proxy.runProfilesets(input, this.#progressProxy(onProgress)),
+    )
+  }
+
+  /** Accumulate partial progress into full Progress + stamp elapsed, over Comlink. */
+  #progressProxy(onProgress: (p: Progress) => void) {
     const started = performance.now()
     let state: Progress = { phase: 'init', pct: 0 }
-    const merged = Comlink.proxy((p: Partial<Progress>) => {
+    return Comlink.proxy((p: Partial<Progress>) => {
       state = { ...state, ...p, elapsedMs: performance.now() - started }
       onProgress(state)
     })
-    return this.#perform((proxy) => proxy.run(input, merged))
   }
 
   cancel(): void {

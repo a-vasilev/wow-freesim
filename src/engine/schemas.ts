@@ -52,6 +52,14 @@ export const SimOptionsSchema = z.object({
    */
   targetError: z.number().min(0).max(2).optional(),
   iterations: z.number().int().min(100).max(1_000_000).optional(),
+  /**
+   * simc `threads=` — how many of the host's logical cores the sim may use. This
+   * is a machine/performance preference (it does NOT affect the DPS result), held
+   * separately + persisted (sim-options/threads-store) and attached at the engine
+   * boundary. When unset, the engine uses ALL available cores. simc requires this
+   * to be ≤ `navigator.hardwareConcurrency`, so it's clamped before use.
+   */
+  threads: z.number().int().min(1).optional(),
 })
 export type SimOptions = z.infer<typeof SimOptionsSchema>
 
@@ -192,6 +200,55 @@ export const SimReportSchema = z.object({
     .optional(),
 })
 export type SimReport = z.infer<typeof SimReportSchema>
+
+// ── Profilesets (Top Gear — WEB_UI_PLAN §7 increment 2a) ─────────────────────
+
+/**
+ * One profileset: a named set of simc override fragments applied on top of the
+ * base profile (e.g. `["finger2=…,id=…", "trinket1=…,id=…"]`). simc runs the base
+ * + every profileset as one parallelized batch (OVERALL_PLAN §7).
+ */
+export const ProfilesetOverrideSchema = z.object({
+  /** Unique, simc-safe set name (we use `tg<n>`); maps results back to a combo. */
+  name: z.string(),
+  /** Raw `slot=item` override fragments, one per changed slot. */
+  overrides: z.array(z.string()).min(1),
+})
+export type ProfilesetOverride = z.infer<typeof ProfilesetOverrideSchema>
+
+export const ProfilesetInputSchema = z.object({
+  profile: z.string().min(1),
+  options: SimOptionsSchema,
+  profilesets: z.array(ProfilesetOverrideSchema).min(1),
+})
+export type ProfilesetInput = z.infer<typeof ProfilesetInputSchema>
+
+export const ProfilesetResultSchema = z.object({
+  name: z.string(),
+  dps: SampleStatSchema,
+  /** simc `mean_error` — the ± convergence band for this set. */
+  meanError: z.number().optional(),
+  iterations: z.number().int().optional(),
+})
+export type ProfilesetResult = z.infer<typeof ProfilesetResultSchema>
+
+export const ProfilesetReportSchema = z.object({
+  meta: z.object({
+    simcVersion: z.string(),
+    fightStyle: z.string().optional(),
+    targets: z.number().int().optional(),
+    fightLength: z.number().optional(),
+    iterations: z.number().int(),
+    targetError: z.number().optional(),
+  }),
+  /** simc's profileset metric label, e.g. "Damage per Second". */
+  metric: z.string(),
+  /** The base profile (current gear) result — the comparison anchor. */
+  baseline: ProfilesetResultSchema,
+  /** Per-profileset results, unsorted as simc emits them (UI ranks by mean). */
+  sets: z.array(ProfilesetResultSchema),
+})
+export type ProfilesetReport = z.infer<typeof ProfilesetReportSchema>
 
 // ── Progress (streamed during run()) ─────────────────────────────────────────
 

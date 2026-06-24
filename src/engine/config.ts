@@ -24,19 +24,19 @@ export interface EngineConfig {
   verifyIntegrity: boolean
 }
 
-const TAG = 'v1205.01'
+const TAG = 'v1205.01-2'
 
 /**
- * The pthread pool size baked into the engine glue (PTHREAD_POOL_SIZE=8). The sim
- * caps `threads=` to this so every worker is pre-allocated — see the deadlock note
- * in wasm-worker.ts. Surfaced here so the UI can show a thread/core line without
- * booting the 107 MB binary. Raising it requires a larger pool in the engine build.
+ * Threads the sim should use on this host: the user's chosen count clamped to
+ * [1, cores], defaulting to ALL logical cores when unset. simc requires `threads=`
+ * to be ≤ the host's hardware concurrency (the engine pre-allocates its pthread
+ * pool to that), so `cores` is a hard ceiling. Surfaced here so the UI can show a
+ * thread/core line without booting the 107 MB binary.
  */
-export const ENGINE_THREAD_POOL = 8
-
-/** Threads the sim will actually use on this host (capped to the pool). */
-export function engineThreadCount(cores: number): number {
-  return Math.min(ENGINE_THREAD_POOL, Math.max(1, cores))
+export function engineThreadCount(cores: number, chosen?: number | null): number {
+  const max = Math.max(1, cores)
+  if (chosen == null) return max
+  return Math.min(max, Math.max(1, Math.floor(chosen)))
 }
 
 // Dev/default: same-origin paths served from .engine-cache by the Vite middleware.
@@ -54,12 +54,12 @@ const wasmUrl = wasmBase
 
 export const ENGINE_CONFIG: EngineConfig = {
   tag: TAG,
-  scVersion: '1205-01',
+  scVersion: '1205-01-2',
   glueUrl: `/engine/${TAG}/simc.js`,
   wasmUrl,
   sha256: {
-    glue: 'd53c56ec678d0bfdd9c564e9cdaa3f354262e1ae204d7b009ce632e799527543',
-    wasm: '22329ac81009d0da191cd177925f15adf7baf27b854154de75923862179e7a55',
+    glue: 'b075936d5e290729825c44f56e611266f5c6a50a71c299a362c3033d97e0cd0c',
+    wasm: '801c9a95aabf363f49ae1d3f5c8189ebcd220957af0b4ef08d27b5a010667dc1',
   },
   // Hashing 107 MB on every boot is wasteful in dev; gate it on prod by default.
   verifyIntegrity: import.meta.env?.PROD ?? false,

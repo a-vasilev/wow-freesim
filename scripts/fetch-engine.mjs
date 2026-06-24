@@ -33,7 +33,11 @@ const sha256 = (buf) => createHash('sha256').update(buf).digest('hex')
 
 console.log(`[fetch] simc-wasm ${TAG} -> ${ENGINE_DIR}`)
 const manifestBuf = await fetchTo('manifest.json')
-const manifest = JSON.parse(manifestBuf.toString('utf8'))
+// The release manifest can carry stray control chars inside string values (the
+// `sc_version` ships with an embedded CR — same quirk handled in bump-engine.mjs).
+// Strip ASCII control chars before parsing; JSON treats inter-token whitespace as
+// optional, so this only cleans the malformed string contents.
+const manifest = JSON.parse(manifestBuf.toString('utf8').replace(/[\x00-\x1f]/g, ''))
 const expect = Object.fromEntries(
   Object.entries(manifest.files).map(([k, v]) => [k, String(v).replace(/^sha256:/, '')]),
 )

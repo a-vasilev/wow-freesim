@@ -18,15 +18,15 @@ interface NavRoute {
   exact?: boolean
 }
 
-// Live routes (DESIGN_SYSTEM §6 nav order). Gear + Droptimizer are Phase 2/3 and
-// render as disabled "Soon" rows so the shell matches spec without dead links.
+// Live routes (DESIGN_SYSTEM §6 nav order). Droptimizer is Phase 3 and renders as
+// a disabled "Soon" row so the shell matches spec without a dead link.
 const NAV_ROUTES: NavRoute[] = [
   { to: '/quick-sim', label: 'Quick Sim', icon: QuickSimIcon },
+  { to: '/gear', label: 'Top Gear', icon: GearIcon },
   { to: '/history', label: 'History', icon: HistoryIcon },
 ]
 
 const SOON_ROUTES: { label: string; icon: IconType }[] = [
-  { label: 'Gear', icon: GearIcon },
   { label: 'Droptimizer', icon: DroptimizerIcon },
 ]
 

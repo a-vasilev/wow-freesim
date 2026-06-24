@@ -1,12 +1,14 @@
 import type { ReactNode } from 'react'
 import * as Popover from '@radix-ui/react-popover'
 import { FIGHT_STYLES, type FightStyle, type SimOptions } from '@/engine'
+import { hardwareConcurrency } from '@/lib/crossOriginIsolated'
 import {
   FIGHT_LENGTH_PRESETS,
   FIGHT_STYLE_LABELS,
   PRECISION_PRESETS,
   precisionLabel,
 } from './presets'
+import { useThreadPref } from './threads-store'
 
 /**
  * The canonical sim-options UI (WEB_UI_PLAN §6.1, DESIGN_SYSTEM §8.2). One
@@ -89,7 +91,52 @@ export function SimOptionChips({
           ))}
         </Section>
       </Chip>
+
+      {/* CPU threads — a host/perf preference, not a sim parameter, so it's only
+          offered while editing (hidden on the read-only report). */}
+      {!readOnly && <ThreadsChip />}
     </div>
+  )
+}
+
+/**
+ * Thread-count selector. Reads/writes the persisted preference directly (it's a
+ * machine setting independent of the per-sim options). Hidden when the host can't
+ * report more than one core — there's nothing to choose.
+ */
+function ThreadsChip() {
+  const cores = hardwareConcurrency()
+  const chosen = useThreadPref((s) => s.threads)
+  const setThreads = useThreadPref((s) => s.setThreads)
+  if (cores <= 1) return null
+
+  const value = chosen ?? cores
+  const isMax = chosen == null || chosen >= cores
+
+  return (
+    <Chip k="Threads" v={isMax ? `${value} · max` : String(value)} readOnly={false}>
+      <Section label="CPU Threads">
+        <p className="text-fg-subtle mb-2 text-xs">
+          How many of your {cores} logical cores simc may use. More threads finish
+          a sim faster; the result is unchanged.
+        </p>
+        <Stepper
+          value={value}
+          min={1}
+          max={cores}
+          // Picking the ceiling stores "auto" (null) so it tracks the hardware.
+          onChange={(n) => setThreads(n >= cores ? null : n)}
+        />
+        <button
+          type="button"
+          onClick={() => setThreads(null)}
+          disabled={isMax}
+          className="text-fg-faint hover:text-fg mt-2 text-xs disabled:opacity-40"
+        >
+          Reset to max ({cores})
+        </button>
+      </Section>
+    </Chip>
   )
 }
 

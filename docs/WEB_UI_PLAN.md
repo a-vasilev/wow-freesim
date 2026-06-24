@@ -535,10 +535,23 @@ build. Token-grounded intent:
 
 ## 7. Later phases (sketch only)
 
-- **Gear (Phase 2 UI):** item DB load + Fuse.js search, slot-based item picker
-  (reuses `features/character/` slot tiles, now editable), gear-set editor, Top
-  Gear / Gear Compare result tables + combinatorial-cap warnings. New
-  `features/gear/`, reuses the engine seam (profileset inputs).
+- **Top Gear (Phase 2 UI):** slot-based item picker (reuses `features/character/`
+  slot tiles, now editable), candidate-set editor, Top Gear result table +
+  combinatorial-cap warnings. New `features/gear/`, reuses the engine seam
+  (profileset inputs). There is **no separate Gear Compare** — set-vs-set is
+  subsumed by Top Gear, which sims any combination you assemble. **Built in two
+  increments so the item-index never gates the whole feature** (§10):
+  - **2a — profile-scoped Top Gear (no index).** Top Gear over items **already in
+    the pasted profile** — equipped *plus* the bag/bank gear the simc addon can
+    export. simc resolves each item string to stats at sim time; Wowhead renders
+    display from the ids. This needs **no item catalog at all** and covers a large
+    share of real Top-Gear use ("best combination of what I already have").
+  - **2b — arbitrary-item picker (needs the index).** The "add an item I don't own"
+    catalog search — Fuse.js over the **`item-index.json` search list** (id / name /
+    slot / ilvl / quality / icon-name / valid bonus options; the fork's read-only CI
+    byproduct, §10). This is the *only* slice that needs the index, and the only
+    runtime source for it: simc has no item-query (`spell_query` is spells/talents
+    only) and Wowhead has no usable search API, so a static index is required here.
 - **Droptimizer (Phase 3 UI):** loot-source browser (instance→encounter→items),
   per-drop delta table, EV/Best-Drop/Priority views. Heaviest data + aggregation
   UI.
@@ -594,21 +607,37 @@ in Quick Sim (§10).
 
 ## 10. Open items to revisit
 
-- **Talent-tree definition data — now the *one remaining* fork dependency, and
-  it's NOT in `v1205.01`.** The engine release shipped the wasm + glue only (§3.1);
-  the engine-data bundle (`talents.json`/`item-index.json`) has **not** landed yet.
-  The full read-only tree grid (§6.5) needs node/position/edge/icon/max-rank data
-  per class, spec, and hero tree. `inspect()` only yields *which* nodes are
-  selected, not the tree shape, and Wowhead's tooltip embed renders individual
-  talents but does **not** hand us the tree graph. **Source:** an **additive,
-  read-only script in the simc fork's CI** emits a compact `talents.json` (not a
-  source patch → keeps the fork rebaseable, `OVERALL_PLAN` §5) — from simc's trait
-  data if it carries node positions/edges, otherwise from Blizzard's Talent Tree
-  API. Until a release adds it, Quick Sim ships on the §6.5 fallback (compact
-  loadout-string + named-list view); adoption when it lands is a no-UI-change step
-  (§5). **Action:** confirm with the fork whether the next release will attach the
-  data bundle, or whether the web repo should derive `talents.json` itself in the
-  interim.
+- **Talent-tree definition data — enhancement, NOT a blocker, and not in
+  `v1205.01`.** The engine release shipped the wasm + glue only (§3.1); the
+  engine-data bundle (`talents.json`/`item-index.json`) has **not** landed yet. The
+  full read-only tree grid (§6.5) needs node/position/edge/icon/max-rank data per
+  class, spec, and hero tree. `inspect()` only yields *which* nodes are selected, not
+  the tree shape, and Wowhead's tooltip embed renders individual talents but does
+  **not** hand us the tree graph — so the *graph* is the only thing this data adds.
+  **Crucially, nothing is gated on it:** Quick Sim ships on the §6.5 fallback
+  (compact loadout-string + named-list view), and adoption when the data lands is a
+  no-UI-change swap (§5). **Source (unchanged):** an **additive, read-only script in
+  the simc fork's CI** emits a compact `talents.json` (not a source patch → keeps the
+  fork rebaseable, `OVERALL_PLAN` §5) — from simc's trait data if it carries node
+  positions/edges, otherwise from Blizzard's Talent Tree API. **Action:** confirm
+  with the fork whether a coming release attaches the data bundle; treat the full
+  tree as a polish item layered on the shipped fallback, not a precondition.
+- **Item-search index — gates only Gear increment 2b, not Phase 2 as a whole.** The
+  `item-index.json` search list (id / name / slot / ilvl / quality / icon-name /
+  valid bonus options — a *search list*, **not** a stats DB; stats come from simc at
+  sim time, display from Wowhead) is **required** for the "add an item I don't own"
+  catalog picker, because there is no runtime alternative: simc exposes no item
+  query (`spell_query` is spells/talents/effects/set_bonus only) and Wowhead has no
+  usable/CORS-accessible search API (scraping is out, `OVERALL_PLAN` §6). But Gear
+  **2a** (Top Gear over profile items — equipped + the addon's
+  bag/bank export) needs **no index**, so the index is sequenced as a *second* Gear
+  increment (§7) rather than a Phase 2 prerequisite. **Source (unchanged):** the
+  fork's additive read-only CI byproduct from simc's baked item data (`dbc_extract`),
+  versioned with the wasm so `data patch == engine patch` (`OVERALL_PLAN` §6). Do
+  **not** extract it from the running wasm — there is no query/dump command, so that
+  would mean patching the fork *and* shipping the data redundantly inside the 107 MB
+  binary. **Action:** confirm the next engine release attaches `item-index.json`;
+  until then build Gear 2a, which doesn't need it.
 - `inspect()` realization & fidelity — **now actionable, not blocked.** The fork
   can emit real `json2`, so finalize `ParsedCharacter` in **U2** against a real
   parse pass (identity + per-slot item/bonus/gem/enchant ids + selected talent node

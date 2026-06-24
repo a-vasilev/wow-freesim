@@ -7,8 +7,13 @@ export {
   type EngineKind,
 } from './factory'
 export { WasmEngine, EngineCancelledError } from './WasmEngine'
-export { ENGINE_CONFIG, ENGINE_THREAD_POOL, engineThreadCount } from './config'
-export { parseCharacter, parseSimReport, parseEncodedItem } from './json2'
+export { ENGINE_CONFIG, engineThreadCount } from './config'
+export {
+  parseCharacter,
+  parseSimReport,
+  parseProfilesetReport,
+  parseEncodedItem,
+} from './json2'
 export {
   FIGHT_STYLES,
   DEFAULT_SIM_OPTIONS,
@@ -16,6 +21,8 @@ export {
   SimOptionsSchema,
   ParsedCharacterSchema,
   SimReportSchema,
+  ProfilesetInputSchema,
+  ProfilesetReportSchema,
   EngineInfoSchema,
   type FightStyle,
   type SimOptions,
@@ -26,6 +33,10 @@ export {
   type AbilityBreakdown,
   type Uptime,
   type SampleStat,
+  type ProfilesetInput,
+  type ProfilesetOverride,
+  type ProfilesetResult,
+  type ProfilesetReport,
   type EngineInfo,
   type Progress,
 } from './schemas'

@@ -8,6 +8,8 @@ import {
   type SimOptions,
   type SimReport,
 } from '@/engine'
+import { looksLikeProfile } from '@/lib/simcProfile'
+import { withThreadPref } from '@/features/sim-options/threads-store'
 
 /** Run-state machine for Quick Sim (WEB_UI_PLAN §6). */
 export type QuickSimPhase =
@@ -48,12 +50,8 @@ interface QuickSimState {
   reset: () => void
 }
 
-/** Heuristic: does this text look like a simc profile worth inspecting? */
-export function looksLikeProfile(text: string): boolean {
-  return /^\s*(death_?knight|demon_?hunter|druid|evoker|hunter|mage|monk|paladin|priest|rogue|shaman|warlock|warrior)\s*=/im.test(
-    text,
-  )
-}
+// Re-export for existing importers; the implementation now lives in lib.
+export { looksLikeProfile }
 
 export const useQuickSim = create<QuickSimState>((set, get) => ({
   phase: 'empty',
@@ -102,8 +100,9 @@ export const useQuickSim = create<QuickSimState>((set, get) => ({
     }
     set({ phase: 'running', error: null, report: null, progress: null })
     try {
-      const report = await getEngine().run({ profile, options }, (progress) =>
-        set({ progress }),
+      const report = await getEngine().run(
+        { profile, options: withThreadPref(options) },
+        (progress) => set({ progress }),
       )
       set({ report, phase: 'report' })
     } catch (e) {

@@ -58,12 +58,11 @@ Ranked easiest → hardest, which is also a sane build order:
    works (just expose the raw config).
 3. **Stat Weights** — simc computes natively. Easy. Include the "you probably
    shouldn't use these" framing the community has adopted.
-4. **Gear Compare** — compare specific gear sets. Needs item picker + item DB.
-   Raidbots calls it legacy; do minimally or fold into Top Gear.
-5. **Top Gear** — item search + try-all-combinations to find the best. Needs item
+4. **Top Gear** — item search + try-all-combinations to find the best. Needs item
    DB + picker + profileset generation over combinations (watch combinatorial
-   blowup).
-6. **Droptimizer** — test every possible drop from a source vs current gear, one
+   blowup). (A separate **Gear Compare** — explicit set-vs-set — is **out of
+   scope**: it's subsumed by Top Gear, which already sims any set you assemble.)
+5. **Droptimizer** — test every possible drop from a source vs current gear, one
    piece at a time. Hard, **not because of simc** but because it needs the full
    seasonal loot-source database + the Expected Value / Best Drop / Priority
    aggregation.
@@ -446,7 +445,7 @@ meets the engine.
 This is the honest tradeoff of client-side compute.
 
 - **Quick Sim** (one profile): seconds. Fine everywhere.
-- **Stat Weights** / small Gear Compare: seconds to a minute.
+- **Stat Weights** / small Top Gear runs: seconds to a minute.
 - **Top Gear / Droptimizer** (hundreds of profilesets): minutes on a strong
   desktop, painful on a weak laptop, effectively **out on phones** for big runs.
 - **Levers:** the precision toggle (`target_error`), profileset caps, real
@@ -467,8 +466,8 @@ CI automation runs from **Phase 0**, not bolted on later.
 - **Phase 1 — Useful tool.** Quick Sim + Advanced + shared sim options
   (fight style, length, targets, precision). Near-zero data dependencies. Ship
   something real.
-- **Phase 2 — Gear.** Item DB + picker; Top Gear + Gear Compare; profileset
-  generation for combinations.
+- **Phase 2 — Gear.** Item DB + picker; Top Gear; profileset generation for
+  combinations.
 - **Phase 3 — Droptimizer.** The seasonal loot-source pipeline + Droptimizer +
   EV/Priority aggregation. Its own sub-project.
 - **Phase 4 — Polish.** Stat Weights, local history (IndexedDB), report sharing,

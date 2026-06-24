@@ -10,10 +10,13 @@
  */
 import {
   ParsedCharacterSchema,
+  ProfilesetReportSchema,
   SimReportSchema,
   type AbilityBreakdown,
   type GearItem,
   type ParsedCharacter,
+  type ProfilesetReport,
+  type ProfilesetResult,
   type SampleStat,
   type SimReport,
   type Uptime,
@@ -84,6 +87,20 @@ interface RawSimOptions {
   fight_style?: string
   desired_targets?: number
 }
+/** A `sim.profilesets.results[]` entry. NOTE the keys differ from RawSample:
+ *  profilesets use `stddev`/`mean_stddev`, the player sample uses
+ *  `std_dev`/`mean_std_dev` (verified against a real v1205.01 profileset run). */
+interface RawProfilesetResult {
+  name?: string
+  mean?: number
+  min?: number
+  max?: number
+  median?: number
+  stddev?: number
+  mean_stddev?: number
+  mean_error?: number
+  iterations?: number
+}
 interface RawJson2 {
   version?: string
   git_revision?: string
@@ -94,6 +111,7 @@ interface RawJson2 {
     players?: RawPlayer[]
     targets?: RawPlayer[]
     statistics?: { simulation_length?: RawSample }
+    profilesets?: { metric?: string; results?: RawProfilesetResult[] }
   }
 }
 
@@ -324,4 +342,62 @@ export function parseSimReport(json2: unknown): SimReport {
     damageTimeline: player.collected_data?.timeline_dmg?.data,
   }
   return SimReportSchema.parse(report)
+}
+
+/** Map a profileset result's flat fields into our SampleStat shape. */
+function profilesetSample(r: RawProfilesetResult): SampleStat {
+  return {
+    mean: r.mean ?? 0,
+    min: r.min,
+    max: r.max,
+    median: r.median,
+    stddev: r.stddev,
+    meanStdDev: r.mean_stddev,
+  }
+}
+
+/**
+ * Extract a Top Gear profileset batch: the base profile (current gear) result as
+ * the `baseline` anchor + every profileset result. Unsorted; the UI ranks them.
+ */
+export function parseProfilesetReport(
+  json2: unknown,
+  baselineName = 'Current gear',
+): ProfilesetReport {
+  const raw = json2 as RawJson2
+  const player = firstPlayer(raw)
+  const options = raw.sim?.options ?? {}
+  const baseSample = sample(player.collected_data?.dps)
+  if (!baseSample) throw new Error('json2 player has no DPS result (base profile failed)')
+
+  const baseline: ProfilesetResult = {
+    name: baselineName,
+    dps: baseSample,
+    meanError:
+      baseSample.meanStdDev != null ? baseSample.meanStdDev * 1.96 : undefined,
+    iterations: options.iterations,
+  }
+  const sets: ProfilesetResult[] = (raw.sim?.profilesets?.results ?? []).map(
+    (r) => ({
+      name: r.name ?? 'Unknown',
+      dps: profilesetSample(r),
+      meanError: r.mean_error,
+      iterations: r.iterations,
+    }),
+  )
+
+  const report: ProfilesetReport = {
+    meta: {
+      simcVersion: raw.version ?? 'unknown',
+      fightStyle: options.fight_style,
+      targets: options.desired_targets,
+      fightLength: options.max_time,
+      iterations: options.iterations ?? 0,
+      targetError: options.target_error || undefined,
+    },
+    metric: raw.sim?.profilesets?.metric ?? 'Damage per Second',
+    baseline,
+    sets,
+  }
+  return ProfilesetReportSchema.parse(report)
 }

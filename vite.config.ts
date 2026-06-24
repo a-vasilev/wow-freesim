@@ -13,7 +13,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { tanstackRouter } from '@tanstack/router-plugin/vite'
 
-const ENGINE_TAG = 'v1205.01'
+const ENGINE_TAG = 'v1205.01-2'
 const ENGINE_CACHE = fileURLToPath(new URL('./.engine-cache', import.meta.url))
 
 // Serve the simc-wasm release artifacts SAME-ORIGIN from .engine-cache/ during

@@ -6,6 +6,8 @@
 import type {
   EngineInfo,
   ParsedCharacter,
+  ProfilesetInput,
+  ProfilesetReport,
   Progress,
   SimInput,
   SimReport,
@@ -24,7 +26,16 @@ export interface SimEngine {
   /** Full simulation. Streams progress; resolves with the parsed report. */
   run(input: SimInput, onProgress: (p: Progress) => void): Promise<SimReport>
 
-  /** Request cancellation of an in-flight run(). */
+  /**
+   * Top Gear: simulate the base profile + N profilesets (gear combinations) as
+   * one batch, returning the baseline + per-set DPS results (WEB_UI_PLAN §7).
+   */
+  runProfilesets(
+    input: ProfilesetInput,
+    onProgress: (p: Progress) => void,
+  ): Promise<ProfilesetReport>
+
+  /** Request cancellation of an in-flight run() / runProfilesets(). */
   cancel(): void
 
   /** Release workers / wasm instance. */
@@ -34,6 +45,8 @@ export interface SimEngine {
 export type {
   EngineInfo,
   ParsedCharacter,
+  ProfilesetInput,
+  ProfilesetReport,
   Progress,
   SimInput,
   SimReport,
