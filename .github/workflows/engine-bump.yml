@@ -42,11 +42,22 @@ jobs:
     env:
       TAG: ${{ github.event.inputs.tag || github.event.client_payload.tag }}
     steps:
+      # Mint a token for the engine-bump GitHub App. The App is in the ruleset's
+      # bypass list, so its push to the protected `main` is allowed — the default
+      # GITHUB_TOKEN's github-actions[bot] can't be added to a ruleset bypass.
+      - uses: actions/create-github-app-token@v2
+        id: app-token
+        with:
+          app-id: ${{ secrets.ENGINE_BUMP_APP_ID }}
+          private-key: ${{ secrets.ENGINE_BUMP_APP_KEY }}
+
       # Always operate on main: bump-engine rewrites the pin against main's content
-      # and the final step commits straight back to it.
+      # and the final step commits straight back to it. Check out with the App token
+      # so the later push is authenticated as the App (the bypass actor).
       - uses: actions/checkout@v4
         with:
           ref: main
+          token: ${{ steps.app-token.outputs.token }}
 
       - uses: actions/setup-node@v4
         with:
@@ -86,14 +97,27 @@ jobs:
             --cache-control "public, max-age=31536000, immutable"
           rm -f simc.wasm
 
+      # Resolve the App's bot user id so the commit is authored by the App bot (the
+      # same identity that pushes) and GitHub links it to the App.
+      - name: Resolve App bot identity
+        id: bot
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          SLUG: ${{ steps.app-token.outputs.app-slug }}
+        run: |
+          set -euo pipefail
+          id=$(gh api "/users/${SLUG}[bot]" --jq .id)
+          echo "name=${SLUG}[bot]" >> "$GITHUB_OUTPUT"
+          echo "email=${id}+${SLUG}[bot]@users.noreply.github.com" >> "$GITHUB_OUTPUT"
+
       # Commit the vendored glue + rewritten pin straight to main. The push uses the
-      # checkout's default GITHUB_TOKEN credentials; Cloudflare Pages' Git integration
-      # sees the push and redeploys. No-op if re-bumping the already-pinned tag.
+      # App-token credentials from checkout (the bypass actor); Cloudflare Pages' Git
+      # integration sees the push and redeploys. No-op if re-bumping the pinned tag.
       - name: Commit to main
         run: |
           set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "${{ steps.bot.outputs.name }}"
+          git config user.email "${{ steps.bot.outputs.email }}"
           git add public/engine src/engine/config.ts
           if git diff --cached --quiet; then
             echo "No changes to commit — already pinned to $TAG."

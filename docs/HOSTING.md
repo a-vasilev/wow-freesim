@@ -107,18 +107,22 @@ release CI fire a `repository_dispatch` (`type: engine-release`,
 `client_payload.tag`).
 
 The wasm lands in R2 *before* the commit, so the redeploy's new pin always resolves
-to bytes that already exist. The commit uses the default `GITHUB_TOKEN`, which by
-design does **not** re-trigger Actions workflows — so a wrangler-based deploy workflow
-(if you keep one) won't double-fire; only Cloudflare's external Git webhook redeploys.
+to bytes that already exist. `main` is protected by a ruleset, and the default
+`GITHUB_TOKEN`'s `github-actions[bot]` **can't** be added to a ruleset bypass list —
+so the workflow pushes using a **GitHub App** token instead (the App *is* a valid
+bypass actor). Cloudflare's external Git webhook redeploys on the push regardless of
+which token authored it.
 
 Prerequisites (one-time):
 
 - **Secrets** (web repo → Settings → Secrets and variables → Actions → *Secrets*):
-  `CLOUDFLARE_API_TOKEN` (needs **"R2 Storage: Edit"**) and `CLOUDFLARE_ACCOUNT_ID`.
+  - `CLOUDFLARE_API_TOKEN` (needs **"R2 Storage: Edit"**) and `CLOUDFLARE_ACCOUNT_ID`.
+  - `ENGINE_BUMP_APP_ID` + `ENGINE_BUMP_APP_KEY` — the App ID and private-key PEM of a
+    GitHub App (e.g. `wow-freesim-engine-bot`) with **Contents: Read & write**,
+    installed on this repo.
 - **Variable** (same page → *Variables*): `R2_ENGINE_BUCKET` = `wow-freesim-engine`.
-- **Branch protection:** the workflow pushes to `main` with `GITHUB_TOKEN`. If `main`
-  is protected, allow GitHub Actions (or the `github-actions[bot]`) to bypass the
-  rule, or the push step will fail.
+- **Ruleset bypass:** add that GitHub App to the `main` ruleset's **Bypass list**
+  (ruleset → *Add bypass* → the App appears under apps), or the push step is blocked.
 
 ### Auto-trigger from the simc fork (optional)
 
