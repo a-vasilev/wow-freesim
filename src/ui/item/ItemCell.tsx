@@ -65,7 +65,7 @@ export function ItemCell({
 }: ItemCellProps) {
   const { href, data } = buildItemWowhead(item)
   const fallbackName = humanize(item.name)
-  const display = useItemDisplay(item.itemId)
+  const display = useItemDisplay(item)
 
   // Bind the live hover tooltip whenever a cell mounts (display data itself comes
   // from the JSON fetch in useItemDisplay, not from this script).
@@ -78,12 +78,15 @@ export function ItemCell({
   const quality = display?.qualityTier != null ? QUALITY[display.qualityTier] : null
   const nameColor = quality?.text ?? 'text-fg-muted'
   const borderColor = quality?.border ?? 'border-border'
+  // Top Gear parses the simc string (no ilvl token); the bonus-adjusted ilvl comes
+  // from the tooltip fetch. Quick Sim's json2 items already carry it, so prefer that.
+  const ilvl = item.ilvl ?? display?.ilvl
 
   const stateClasses = interactive
     ? selected
       ? 'border-accent bg-accent-subtle cursor-pointer'
       : 'border-border-subtle hover:border-border hover:bg-surface-inset cursor-pointer'
-    : 'border-border-subtle bg-surface-inset'
+    : 'border-border-subtle bg-surface-inset hover:border-border'
 
   const interactiveProps = interactive
     ? {
@@ -102,31 +105,17 @@ export function ItemCell({
 
   return (
     <div
-      className={`flex items-center gap-2.5 rounded-md border p-2 transition-colors ${stateClasses}`}
+      className={`relative flex items-center gap-2.5 rounded-md border p-2 transition-colors ${stateClasses}`}
       {...interactiveProps}
     >
       <span
-        className={`relative size-10 shrink-0 overflow-hidden rounded-sm border ${borderColor}`}
+        className={`size-10 shrink-0 overflow-hidden rounded-sm border ${borderColor}`}
       >
         <img
           src={iconUrl}
           alt=""
           aria-hidden="true"
           className="size-full object-cover"
-        />
-        {/* Transparent tooltip anchor over the icon: hover shows the Wowhead
-            tooltip; iconize/rename off so it injects nothing; preventDefault kills
-            navigation; the click bubbles to the cell so the whole box selects. */}
-        <a
-          href={href}
-          data-wowhead={data}
-          data-wh-iconize-link="false"
-          data-wh-rename-link="false"
-          rel="noreferrer"
-          tabIndex={-1}
-          aria-hidden="true"
-          onClick={(e) => e.preventDefault()}
-          className="absolute inset-0"
         />
       </span>
 
@@ -144,24 +133,40 @@ export function ItemCell({
             </span>
           )}
         </div>
-        <ItemMeta item={item} />
+        <ItemMeta item={item} ilvl={ilvl} />
       </div>
 
-      {trailing && <div className="shrink-0">{trailing}</div>}
+      {trailing && <div className="relative shrink-0">{trailing}</div>}
+
+      {/* Transparent tooltip anchor over the WHOLE cell: hover anywhere shows the
+          Wowhead tooltip; iconize/rename off so it injects nothing; preventDefault
+          kills navigation; the click bubbles to the cell so an interactive box still
+          toggles. Read-only cells get a hover-tooltip target across the whole row. */}
+      <a
+        href={href}
+        data-wowhead={data}
+        data-wh-iconize-link="false"
+        data-wh-rename-link="false"
+        rel="noreferrer"
+        tabIndex={-1}
+        aria-hidden="true"
+        onClick={(e) => e.preventDefault()}
+        className="absolute inset-0"
+      />
     </div>
   )
 }
 
-/** ilvl + socket + enchant meta row, from our id-only model. */
-function ItemMeta({ item }: { item: GearItem }) {
+/** ilvl + socket + enchant meta row. ilvl comes from json2 or the tooltip fetch. */
+function ItemMeta({ item, ilvl }: { item: GearItem; ilvl?: number }) {
   const hasGem = item.gemIds.length > 0
   const hasEnchant = item.enchantId != null
-  if (item.ilvl == null && !hasGem && !hasEnchant) return null
+  if (ilvl == null && !hasGem && !hasEnchant) return null
   return (
     <div className="text-fg-faint flex items-center gap-2 text-xs tabular-nums">
-      {item.ilvl != null && (
+      {ilvl != null && (
         <span className="text-tooltip-info font-display font-semibold">
-          {item.ilvl}
+          {ilvl}
         </span>
       )}
       {hasGem && (

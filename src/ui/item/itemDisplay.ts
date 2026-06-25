@@ -1,18 +1,22 @@
 import { useEffect, useSyncExternalStore } from 'react'
+import { fetchTooltip } from '@/ui/wowhead/itemTooltip'
 
 /**
- * Per-item display cache: the icon URL, real display name, and quality tier for
- * an item id. ItemCell renders from this React-owned state, so re-mounts (back
- * button, route changes) are instant and correct.
+ * Per-item display cache: icon URL, real display name, quality tier, and item
+ * level. ItemCell renders from this React-owned state, so re-mounts (back button,
+ * route changes) are instant and correct.
  *
- * We get the three fields from Wowhead's CORS-enabled tooltip JSON endpoint
- * (`nether.wowhead.com/tooltip/item/{id}` — the SAME endpoint wowheadItem.ts uses
- * for armor-type), NOT by scraping the DOM the Power script injects. Scraping was
- * fragile: `refreshLinks()` short-circuits when Power has the entity cached
- * internally, leaving no mutation for a MutationObserver to catch, so freshly
- * mounted cells (e.g. bag candidates in Top Gear) got stuck on the fallback
- * questionmark + humanized name. The JSON fetch is deterministic for every item,
- * mount, and re-mount. (Power.js is still loaded for the live hover tooltip.)
+ * Derived from the shared Wowhead tooltip payload (`@/ui/wowhead/itemTooltip` —
+ * one fetch per item-spec, shared with the equippability filter), NOT by scraping
+ * the DOM the Power script injects. Scraping was fragile: `refreshLinks()`
+ * short-circuits when Power has the entity cached internally, leaving no mutation
+ * for a MutationObserver to catch, so freshly mounted cells (e.g. bag candidates
+ * in Top Gear) got stuck on the fallback questionmark + humanized name. The JSON
+ * payload is deterministic for every item, mount, and re-mount. (Power.js is still
+ * loaded for the live hover tooltip.)
+ *
+ * Keyed by id+bonus: bonus ids drive the upgraded item level the tooltip reports,
+ * so the same id at a different upgrade track is a distinct entry.
  */
 export interface ItemDisplay {
   /** zamimg icon URL; absent until fetched (cell shows the questionmark). */
@@ -21,82 +25,87 @@ export interface ItemDisplay {
   name: string
   /** Wowhead quality tier 0..5, or null if not yet known. */
   qualityTier: number | null
+  /** Item level (bonus-adjusted), or undefined if not yet known / unparseable. */
+  ilvl?: number
 }
 
-const cache = new Map<number, ItemDisplay>()
-const listeners = new Map<number, Set<() => void>>()
-/** Ids whose fetch is in flight or has completed (success or failure) — never refetched. */
-const attempted = new Set<number>()
+/** What we need to key + fetch an item's display (a structural slice of GearItem). */
+interface ItemRef {
+  itemId: number
+  bonusIds: number[]
+}
 
-const TOOLTIP_BASE = 'https://nether.wowhead.com/tooltip/item/'
+const cache = new Map<string, ItemDisplay>()
+const listeners = new Map<string, Set<() => void>>()
+/** Keys whose derive has been kicked off — never re-run (the fetch itself is also cached). */
+const attempted = new Set<string>()
+
 const ICON_BASE = 'https://wow.zamimg.com/images/wow/icons/large/'
+// Locale-independent item-level marker in the tooltip HTML (`Item Level <!--ilvl-->NNN`).
+const ILVL_RE = /<!--ilvl-->(\d+)/
 
-export function getItemDisplay(itemId: number): ItemDisplay | undefined {
-  return cache.get(itemId)
+function keyOf(item: ItemRef): string {
+  return item.bonusIds.length
+    ? `${item.itemId}?bonus=${item.bonusIds.join(':')}`
+    : `${item.itemId}`
 }
 
-function setItemDisplay(itemId: number, next: ItemDisplay): void {
-  const prev = cache.get(itemId)
+function setItemDisplay(key: string, next: ItemDisplay): void {
+  const prev = cache.get(key)
   if (
     prev &&
     prev.iconUrl === next.iconUrl &&
     prev.name === next.name &&
-    prev.qualityTier === next.qualityTier
+    prev.qualityTier === next.qualityTier &&
+    prev.ilvl === next.ilvl
   ) {
     return
   }
-  cache.set(itemId, next)
-  listeners.get(itemId)?.forEach((l) => l())
+  cache.set(key, next)
+  listeners.get(key)?.forEach((l) => l())
 }
 
-function subscribe(itemId: number, cb: () => void): () => void {
-  let set = listeners.get(itemId)
-  if (!set) listeners.set(itemId, (set = new Set()))
+function subscribe(key: string, cb: () => void): () => void {
+  let set = listeners.get(key)
+  if (!set) listeners.set(key, (set = new Set()))
   set.add(cb)
   return () => {
     set.delete(cb)
-    if (set.size === 0) listeners.delete(itemId)
+    if (set.size === 0) listeners.delete(key)
   }
 }
 
-interface TooltipJson {
-  name?: string
-  quality?: number
-  icon?: string
-}
-
 /**
- * Fetch {iconUrl, name, qualityTier} for `itemId` from Wowhead's tooltip JSON,
- * once, into the cache. No-ops if already attempted (in flight or done). On any
- * failure we leave the cache empty so the cell keeps its humanized fallback name.
+ * Derive {iconUrl, name, qualityTier, ilvl} for an item from the shared tooltip
+ * payload into the cache, once. No-ops if already kicked off. On any failure we
+ * leave the cache empty so the cell keeps its humanized fallback name.
  */
-export function fetchItemDisplay(itemId: number): void {
-  if (attempted.has(itemId)) return
-  attempted.add(itemId)
-  void (async () => {
-    try {
-      const res = await fetch(`${TOOLTIP_BASE}${itemId}`, { mode: 'cors' })
-      if (!res.ok) return
-      const data = (await res.json()) as TooltipJson
-      if (!data.name && !data.icon) return
-      setItemDisplay(itemId, {
-        name: data.name || cache.get(itemId)?.name || '',
-        qualityTier: data.quality ?? null,
-        iconUrl: data.icon ? `${ICON_BASE}${data.icon}.jpg` : undefined,
-      })
-    } catch {
-      // Network/parse failure — fail open; the cell shows its fallback name.
-    }
-  })()
+export function fetchItemDisplay(item: ItemRef): void {
+  const key = keyOf(item)
+  if (attempted.has(key)) return
+  attempted.add(key)
+  void fetchTooltip(item.itemId, item.bonusIds).then((data) => {
+    if (!data || (!data.name && !data.icon)) return
+    const ilvl = ILVL_RE.exec(data.tooltip ?? '')
+    setItemDisplay(key, {
+      name: data.name || cache.get(key)?.name || '',
+      qualityTier: data.quality ?? null,
+      iconUrl: data.icon ? `${ICON_BASE}${data.icon}.jpg` : undefined,
+      ilvl: ilvl ? Number(ilvl[1]) : undefined,
+    })
+  })
 }
 
 /** Subscribe a component to one item's cached display, fetching it on first use. */
-export function useItemDisplay(itemId: number): ItemDisplay | undefined {
+export function useItemDisplay(item: ItemRef): ItemDisplay | undefined {
+  const key = keyOf(item)
   useEffect(() => {
-    fetchItemDisplay(itemId)
-  }, [itemId])
+    fetchItemDisplay(item)
+    // key captures the only inputs that matter (id + bonus).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key])
   return useSyncExternalStore(
-    (cb) => subscribe(itemId, cb),
-    () => cache.get(itemId),
+    (cb) => subscribe(key, cb),
+    () => cache.get(key),
   )
 }

@@ -208,7 +208,13 @@ async function validateBagItems(
 ): Promise<DroppedItem[]> {
   const bag = new Map<
     string,
-    { slot: string; label: string; name?: string; itemId: number }
+    {
+      slot: string
+      label: string
+      name?: string
+      itemId: number
+      bonusIds: number[]
+    }
   >()
   for (const slot of model.slots) {
     for (const c of slot.candidates) {
@@ -218,13 +224,14 @@ async function validateBagItems(
         label: slot.label,
         name: c.item.name,
         itemId: c.item.itemId,
+        bonusIds: c.item.bonusIds,
       })
     }
   }
   if (!bag.size) return []
 
   const entries = [...bag.entries()]
-  const infos = await fetchItemClassInfos(entries.map(([, v]) => v.itemId))
+  const infos = await fetchItemClassInfos(entries.map(([, v]) => v))
   const dropped: DroppedItem[] = []
   for (const [uid, v] of entries) {
     if (!isUsable(classId, v.slot, infos.get(v.itemId) ?? null)) {
