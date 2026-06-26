@@ -23,8 +23,11 @@ export function Dialog({
   return (
     <RDialog.Root open={open} onOpenChange={onOpenChange}>
       <RDialog.Portal>
-        <RDialog.Overlay className="bg-surface/70 fixed inset-0 z-50" />
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        {/* Overlay IS the centering container: a click anywhere on the dimmed
+            canvas (not just a hairline strip behind the card) lands on the Overlay
+            and dismisses, per DESIGN_SYSTEM §10. Clicks on Content don't bubble a
+            dismiss — Radix's DismissableLayer only closes on interaction outside it. */}
+        <RDialog.Overlay className="bg-surface/70 fixed inset-0 z-50 flex items-center justify-center p-4">
           <RDialog.Content className="bg-surface-overlay border-border-subtle w-full max-w-md rounded-lg border p-5 shadow-lg outline-none">
             <RDialog.Title className="text-fg font-display text-base font-semibold">
               {title}
@@ -36,7 +39,7 @@ export function Dialog({
             )}
             {children}
           </RDialog.Content>
-        </div>
+        </RDialog.Overlay>
       </RDialog.Portal>
     </RDialog.Root>
   )

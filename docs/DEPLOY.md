@@ -106,6 +106,14 @@ succeeding under our COOP/COEP headers. **Prove this before relying on it:**
      Function and, at high traffic, Worker-invocation cost unless edge-cached. This
      is *not* the optional OAuth/sharing backend.
 
+## Armory import (Blizzard API)
+
+The optional "Import from the Armory" feature adds a same-origin Pages Function
+(`functions/api/armory.ts`) that needs two encrypted Pages env vars
+(`BLIZZARD_CLIENT_ID` / `BLIZZARD_CLIENT_SECRET`). Setup + local-dev steps live in
+[`ARMORY_IMPORT.md`](./ARMORY_IMPORT.md). It is unrelated to the engine/wasm
+hosting below.
+
 ## 5. First-load UX
 
 107 MB is a one-time, cacheable download. The engine loads **lazily** (only on the

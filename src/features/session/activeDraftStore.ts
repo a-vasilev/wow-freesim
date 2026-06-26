@@ -53,6 +53,14 @@ interface ActiveDraftState {
   ) => void
   /** Return to the remembered unbound scratch paste (the switcher footer). */
   selectUnbound: () => void
+  /**
+   * Drop a `bound` that no longer resolves to a real character/loadout. The draft
+   * store (localStorage) and the character repository (IndexedDB) are separate
+   * persistence layers with no referential integrity, so a delete elsewhere — or a
+   * rehydrate against a since-changed library — can leave `bound` dangling, which
+   * otherwise makes "Update loadout" silently no-op. Falls back to a scratch paste.
+   */
+  reconcileBound: (exists: (characterId: string, loadoutId: string) => boolean) => void
   /** Reset to an empty, unbound draft. */
   clear: () => void
 }
@@ -71,7 +79,14 @@ export const useActiveDraft = create<ActiveDraftState>()(
       setEdits: (edits) =>
         set((s) => ({ edits, dirty: s.bound != null ? true : false })),
       bind: (characterId, loadoutId) =>
-        set({ bound: { characterId, loadoutId }, dirty: false }),
+        set((s) => ({
+          bound: { characterId, loadoutId },
+          dirty: false,
+          // Stash the scratch when binding FROM an unbound draft (e.g. "Save as
+          // character"), so the switcher's "Unsaved paste" can return to it — same
+          // as selectLoadout. Without this, saving a paste loses the scratch buffer.
+          lastUnboundBase: s.bound == null ? s.base : s.lastUnboundBase,
+        })),
       unbind: () => set({ bound: null, dirty: false }),
       selectLoadout: (bound, base, edits) =>
         set((s) => ({
@@ -90,6 +105,12 @@ export const useActiveDraft = create<ActiveDraftState>()(
           bound: null,
           dirty: false,
         })),
+      reconcileBound: (exists) =>
+        set((s) =>
+          s.bound && !exists(s.bound.characterId, s.bound.loadoutId)
+            ? { bound: null, dirty: false }
+            : s,
+        ),
       clear: () =>
         set({ base: '', edits: [], bound: null, dirty: false }),
     }),

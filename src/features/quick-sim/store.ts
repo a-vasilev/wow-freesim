@@ -68,6 +68,10 @@ function currentOptions(): SimOptions {
   return useSimOptions.getState().options
 }
 
+// Identifies the current run so a superseded one (cancelled, or replaced by
+// loadRun/reset) can't write its late progress/report/catch over newer state.
+let runGen = 0
+
 export const useQuickSim = create<QuickSimState>((set, get) => ({
   phase: 'empty',
   mode: 'compose',
@@ -80,6 +84,10 @@ export const useQuickSim = create<QuickSimState>((set, get) => ({
   setMode: (mode) => set({ mode }),
 
   inspect: async () => {
+    // Never let an auto-inspect interrupt a live sim: inspect() goes through the
+    // same single-worker engine, so firing it mid-run would supersede (kill) the
+    // run. The seam enforces one worker; this keeps inspect from being the killer.
+    if (get().phase === 'running') return
     const profile = currentProfile()
     if (!looksLikeProfile(profile)) return
     set({ phase: 'inspecting', error: null })
@@ -112,14 +120,19 @@ export const useQuickSim = create<QuickSimState>((set, get) => ({
       })
       return
     }
+    const gen = ++runGen
     set({ phase: 'running', error: null, report: null, progress: null, source: null })
     try {
       const report = await getEngine().run(
         { profile, options: withThreadPref(options) },
-        (progress) => set({ progress }),
+        (progress) => {
+          if (gen === runGen) set({ progress })
+        },
       )
+      if (gen !== runGen) return // superseded by loadRun/reset/another run
       set({ report, phase: 'report', source: { profile, options } })
     } catch (e) {
+      if (gen !== runGen) return // a newer state owns the store; don't clobber it
       if (e instanceof EngineCancelledError) {
         set({ phase: get().character ? 'ready' : 'empty', progress: null })
       } else {
@@ -133,6 +146,11 @@ export const useQuickSim = create<QuickSimState>((set, get) => ({
   editProfile: () => set({ phase: get().character ? 'ready' : 'empty' }),
 
   loadRun: ({ profile, options, report }) => {
+    // Supersede any in-flight sim so its late completion can't overwrite the
+    // historical report we're loading (cancel frees the worker; the runGen bump
+    // makes the run's settle a no-op).
+    runGen++
+    getEngine().cancel()
     // A historical run becomes the shared working profile (one-draft model, §2.1),
     // unbound — it's a snapshot, not tied to a saved loadout.
     useActiveDraft.setState({ base: profile, edits: [], bound: null, dirty: false })
@@ -150,7 +168,10 @@ export const useQuickSim = create<QuickSimState>((set, get) => ({
 
   // Tab-local reset only — the shared draft (the working profile) is left intact;
   // clearing it is an explicit user action elsewhere, not a side effect of a tab.
-  reset: () =>
+  reset: () => {
+    // Drop any in-flight sim so it can't settle back over the reset state.
+    runGen++
+    getEngine().cancel()
     set({
       phase: 'empty',
       character: null,
@@ -158,7 +179,8 @@ export const useQuickSim = create<QuickSimState>((set, get) => ({
       progress: null,
       error: null,
       source: null,
-    }),
+    })
+  },
 }))
 
 function messageOf(e: unknown): string {

@@ -62,4 +62,11 @@ export default tseslint.config(
     files: ['vite.config.ts', 'eslint.config.js'],
     languageOptions: { globals: globals.node },
   },
+  {
+    // Cloudflare Pages Functions are a separate (Workers) runtime, NOT part of the
+    // app's tsconfig/Vite graph. They use Web-platform globals (fetch, Response,
+    // URL, btoa, URLSearchParams) — same set as the browser config above.
+    files: ['functions/**/*.ts'],
+    languageOptions: { globals: globals.browser },
+  },
 )

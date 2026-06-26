@@ -5,7 +5,7 @@
  * returns to the unsaved scratch paste or routes to the library. Switching while
  * the draft is dirty raises the discard warning (§6.6).
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import * as Popover from '@radix-ui/react-popover'
 import { useNavigate } from '@tanstack/react-router'
 import { ChevronDownIcon, ChevronRightIcon } from '@/ui/icons'
@@ -33,6 +33,22 @@ export function CharacterSwitcher() {
   const boundLoadout = boundChar?.loadouts.find(
     (l) => l.id === bound?.loadoutId,
   )
+
+  // Once the library has loaded, drop a `bound` that points at a deleted
+  // character/loadout (a delete here or in another tab, or a stale rehydrate).
+  // Leaving it would make SaveCharacterControl's "Update loadout" silently no-op.
+  useEffect(() => {
+    if (!characters) return
+    useActiveDraft
+      .getState()
+      .reconcileBound((characterId, loadoutId) =>
+        characters.some(
+          (c) =>
+            c.id === characterId &&
+            c.loadouts.some((l) => l.id === loadoutId),
+        ),
+      )
+  }, [characters])
 
   function close() {
     setOpen(false)

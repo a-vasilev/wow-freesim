@@ -1,0 +1,8 @@
+# Copy to `.dev.vars` (gitignored) for local `npx wrangler pages dev`.
+# These are SERVER-ONLY secrets read by functions/api/armory.ts via `env`. They are
+# NOT build-time Vite vars — do NOT add a VITE_ prefix or they'd leak into the
+# client bundle. Create a Blizzard API client at https://develop.battle.net/access/clients.
+# Without these set, /api/armory returns the 500 "not configured" message by design.
+
+BLIZZARD_CLIENT_ID=
+BLIZZARD_CLIENT_SECRET=

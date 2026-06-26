@@ -2,6 +2,7 @@ import * as Collapsible from '@radix-ui/react-collapsible'
 import { GearPanel } from '@/features/character/GearPanel'
 import { TalentPanel } from '@/features/character/TalentPanel'
 import { useActiveDraft } from '@/features/session/activeDraftStore'
+import { ArmoryImportForm } from '@/features/characters/armory/ArmoryImportForm'
 import { useQuickSim } from './store'
 import sampleProfile from '@/engine/fixtures/sample-profile.simc?raw'
 
@@ -53,6 +54,13 @@ function EmptyPaste() {
           </button>
         )}
       </div>
+
+      <div className="border-border-subtle flex items-center gap-3 pt-2">
+        <span className="border-border-subtle flex-1 border-t" />
+        <span className="text-fg-faint text-xs tracking-wide uppercase">or</span>
+        <span className="border-border-subtle flex-1 border-t" />
+      </div>
+      <ArmoryImportForm />
     </div>
   )
 }

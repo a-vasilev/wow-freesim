@@ -76,6 +76,10 @@ function currentProfile(): string {
 // state — only the latest inspect's results are applied.
 let inspectGen = 0
 
+// Same guard for runs: a superseded run (cancelled, or replaced by reset/edit)
+// must not write its late progress/report/catch over newer state.
+let runGen = 0
+
 export const useTopGear = create<GearState>((set, get) => ({
   phase: 'empty',
   character: null,
@@ -96,6 +100,9 @@ export const useTopGear = create<GearState>((set, get) => ({
   },
 
   inspect: async () => {
+    // Don't let an auto-inspect interrupt a live run: both share the single-worker
+    // engine, so inspecting mid-run would supersede (kill) the run.
+    if (get().phase === 'running') return
     const profile = currentProfile()
     const options = useSimOptions.getState().options
     if (!looksLikeProfile(profile)) return
@@ -158,6 +165,7 @@ export const useTopGear = create<GearState>((set, get) => ({
       return
     }
 
+    const gen = ++runGen
     set({ phase: 'running', error: null, report: null, progress: null, plans })
     try {
       const report = await getEngine().runProfilesets(
@@ -169,10 +177,14 @@ export const useTopGear = create<GearState>((set, get) => ({
             overrides: p.overrides,
           })),
         },
-        (progress) => set({ progress }),
+        (progress) => {
+          if (gen === runGen) set({ progress })
+        },
       )
+      if (gen !== runGen) return // superseded by reset/edit/another run
       set({ report, phase: 'results' })
     } catch (e) {
+      if (gen !== runGen) return // a newer state owns the store; don't clobber it
       if (e instanceof EngineCancelledError) {
         set({ phase: 'ready', progress: null })
       } else {
@@ -183,10 +195,17 @@ export const useTopGear = create<GearState>((set, get) => ({
 
   cancel: () => getEngine().cancel(),
 
-  edit: () => set({ phase: get().model ? 'ready' : 'empty' }),
+  edit: () => {
+    // Leaving the results view drops any in-flight run so it can't settle back over us.
+    runGen++
+    getEngine().cancel()
+    set({ phase: get().model ? 'ready' : 'empty' })
+  },
 
   // Tab-local reset only — the shared draft (the working profile) is left intact.
-  reset: () =>
+  reset: () => {
+    runGen++
+    getEngine().cancel()
     set({
       phase: 'empty',
       character: null,
@@ -197,7 +216,8 @@ export const useTopGear = create<GearState>((set, get) => ({
       droppedItems: [],
       progress: null,
       error: null,
-    }),
+    })
+  },
 }))
 
 // ── bag/bank validation (Wowhead-driven) ─────────────────────────────────────

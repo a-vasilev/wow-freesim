@@ -52,7 +52,13 @@ export function loadWowhead(): Promise<void> {
     // which is exactly why we use credentialless not require-corp. Do NOT set
     // crossOrigin: that forces a CORS request, and Wowhead sends no ACAO → blocked.
     script.onload = () => resolve()
-    script.onerror = () => reject(new Error('Failed to load Wowhead power.js'))
+    script.onerror = () => {
+      // Don't poison the whole session: clear the cached promise so a later
+      // loadWowhead() (e.g. the next ItemCell mount) retries instead of getting
+      // back this same rejection forever. Tooltips can recover once the blip ends.
+      loadPromise = null
+      reject(new Error('Failed to load Wowhead power.js'))
+    }
     document.head.appendChild(script)
   })
   return loadPromise

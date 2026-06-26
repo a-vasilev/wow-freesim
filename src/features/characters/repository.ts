@@ -140,11 +140,17 @@ export async function addLoadout(
   })
 }
 
-/** Patch one loadout in place (used by both update-base and Phase-3 edits). */
+/**
+ * Patch one loadout in place (used by both update-base and Phase-3 edits).
+ * `touch` (default true) bumps `updatedAt` on the loadout and the character — set
+ * it false for derived/display-only writes (the inspected ilvl cache) that must
+ * NOT count as a user edit or reorder the most-recently-updated library list.
+ */
 async function patchLoadout(
   characterId: string,
   loadoutId: string,
   patch: Partial<Pick<Loadout, 'name' | 'base' | 'edits' | 'ilvl' | 'spec'>>,
+  { touch = true }: { touch?: boolean } = {},
 ): Promise<void> {
   await db.transaction('rw', db.characters, async () => {
     const c = await db.characters.get(characterId)
@@ -153,9 +159,11 @@ async function patchLoadout(
     await db.characters.put({
       ...c,
       loadouts: c.loadouts.map((l) =>
-        l.id === loadoutId ? { ...l, ...patch, updatedAt: now } : l,
+        l.id === loadoutId
+          ? { ...l, ...patch, ...(touch ? { updatedAt: now } : {}) }
+          : l,
       ),
-      updatedAt: now,
+      ...(touch ? { updatedAt: now } : {}),
     })
   })
 }
@@ -170,13 +178,17 @@ export function updateLoadoutBase(
   return patchLoadout(characterId, loadoutId, { base, ilvl })
 }
 
-/** Refresh a loadout's derived display ilvl after an inspect, if it changed. */
+/**
+ * Refresh a loadout's derived display ilvl after an inspect, if it changed. This
+ * is a display cache, not a user edit — `touch: false` keeps it from bumping
+ * `updatedAt` (which would reorder the library just from browsing a character).
+ */
 export function setLoadoutIlvl(
   characterId: string,
   loadoutId: string,
   ilvl: number,
 ): Promise<void> {
-  return patchLoadout(characterId, loadoutId, { ilvl })
+  return patchLoadout(characterId, loadoutId, { ilvl }, { touch: false })
 }
 
 export function renameLoadout(
