@@ -9,12 +9,16 @@ import type { ReactNode } from 'react'
 export function ContentHeader({
   title,
   crumb,
+  lead,
   tabs,
   right,
 }: {
   title: ReactNode
   /** Optional breadcrumb tail rendered faint after the title, e.g. "Report". */
   crumb?: ReactNode
+  /** Optional control placed left, just after the title — e.g. the character
+   *  switcher (the shared one-profile anchor, CHARACTER_PERSISTENCE §7.1). */
+  lead?: ReactNode
   /** Optional segmented sub-tab row (SubTabs), placed left next to the title. */
   tabs?: ReactNode
   right?: ReactNode
@@ -30,6 +34,7 @@ export function ContentHeader({
           </span>
         )}
       </h1>
+      {lead != null && <div className="flex items-center">{lead}</div>}
       {tabs != null && <div className="flex items-stretch gap-1">{tabs}</div>}
       {right != null && (
         <div className="ml-auto flex items-center gap-3">{right}</div>

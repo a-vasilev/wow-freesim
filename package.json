@@ -21,6 +21,7 @@
     "@fontsource-variable/inter": "^5.2.8",
     "@fontsource-variable/space-grotesk": "^5.2.10",
     "@radix-ui/react-collapsible": "^1.1.14",
+    "@radix-ui/react-dialog": "^1.1.17",
     "@radix-ui/react-popover": "^1.1.17",
     "@tanstack/react-router": "^1.170.16",
     "@visx/axis": "^4.0.0",

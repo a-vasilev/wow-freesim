@@ -8,6 +8,7 @@
 import Dexie, { liveQuery, type Table } from 'dexie'
 import { useEffect, useState } from 'react'
 import type { SimOptions, SimReport } from '@/engine'
+import type { Character } from '@/features/characters/types'
 
 /** The indexed summary surfaced in the history list. */
 export interface HistoryRunMeta {
@@ -35,6 +36,11 @@ export interface HistoryRunPayload {
 class HistoryDb extends Dexie {
   runs!: Table<HistoryRunMeta, string>
   payloads!: Table<HistoryRunPayload, string>
+  /**
+   * Character library (CHARACTER_PERSISTENCE §4). Loadouts are stored nested on
+   * the row (small, always loaded together), so only `id`/`updatedAt` are indexed.
+   */
+  characters!: Table<Character, string>
 
   constructor() {
     super('ilvl-history')
@@ -42,6 +48,11 @@ class HistoryDb extends Dexie {
       // Only indexed fields are listed; the rest are stored unindexed.
       runs: 'id, createdAt',
       payloads: 'id',
+    })
+    // v2 — additive: adds the characters table, no change to runs/payloads (no
+    // data loss). Dexie carries existing rows forward untouched.
+    this.version(2).stores({
+      characters: 'id, updatedAt',
     })
   }
 }

@@ -7,6 +7,7 @@ import {
   GearIcon,
   HistoryIcon,
   QuickSimIcon,
+  RosterIcon,
 } from '@/ui/icons'
 import { Brand } from './Brand'
 import { useSidebar } from './sidebar-store'
@@ -25,6 +26,7 @@ interface NavRoute {
 const NAV_ROUTES: NavRoute[] = [
   { to: '/quick-sim', label: 'Quick Sim', icon: QuickSimIcon },
   { to: '/gear', label: 'Top Gear', icon: GearIcon },
+  { to: '/characters', label: 'Characters', icon: RosterIcon },
   { to: '/history', label: 'History', icon: HistoryIcon },
 ]
 

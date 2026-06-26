@@ -1,6 +1,10 @@
 import { useEffect } from 'react'
 import { ContentHeader } from '@/app/components/ContentHeader'
 import { SimOptionChips } from '@/features/sim-options/SimOptionChips'
+import { useSimOptions } from '@/features/sim-options/simOptionsStore'
+import { useActiveDraft } from '@/features/session/activeDraftStore'
+import { CharacterSwitcher } from '@/features/characters/CharacterSwitcher'
+import { SaveCharacterControl } from '@/features/characters/SaveCharacterControl'
 import { looksLikeProfile } from '@/lib/simcProfile'
 import { MAX_COMBOS, comboCount, slotIsVaried } from './combos'
 import { ComboSummary, GearComposeBody } from './GearComposeBody'
@@ -16,18 +20,22 @@ import { useTopGear } from './store'
  */
 export function TopGear() {
   const s = useTopGear()
-  const { phase, profile, inspect } = s
+  const { phase, inspect } = s
+  // Working profile + fight settings come from the shared stores (§5.2).
+  const base = useActiveDraft((d) => d.base)
+  const options = useSimOptions((o) => o.options)
+  const setOptions = useSimOptions((o) => o.setOptions)
 
   // Debounced auto-inspect on profile change (parses the gear model + identity).
   useEffect(() => {
-    if (!looksLikeProfile(profile)) return
+    if (!looksLikeProfile(base)) return
     const t = setTimeout(() => {
       const ph = useTopGear.getState().phase
       if (ph === 'running' || ph === 'results') return
       inspect()
     }, 600)
     return () => clearTimeout(t)
-  }, [profile, inspect])
+  }, [base, inspect])
 
   const isResults = phase === 'results'
   const showContextBar =
@@ -45,11 +53,12 @@ export function TopGear() {
       <ContentHeader
         title="Top Gear"
         crumb={isResults ? 'Results' : undefined}
+        lead={<CharacterSwitcher />}
         right={
           <>
             <SimOptionChips
-              options={s.options}
-              onChange={isResults ? undefined : s.setOptions}
+              options={options}
+              onChange={isResults ? undefined : setOptions}
               readOnly={isResults}
             />
             {isResults && (
@@ -81,6 +90,9 @@ export function TopGear() {
               )}
             </div>
             <div className="flex items-center gap-5">
+              {phase !== 'running' && !isResults && (
+                <SaveCharacterControl character={s.character} />
+              )}
               {phase !== 'running' && !isResults && <ComboSummary />}
               <ContextAction runnable={runnable} />
             </div>

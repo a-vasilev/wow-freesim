@@ -2,6 +2,7 @@ import { useState } from 'react'
 import * as Collapsible from '@radix-ui/react-collapsible'
 import { ItemCell } from '@/ui/item/ItemCell'
 import { WowheadAttribution } from '@/ui/wowhead'
+import { useActiveDraft } from '@/features/session/activeDraftStore'
 import sampleProfile from '@/engine/fixtures/sample-profile.simc?raw'
 import { MAX_COMBOS, WARN_COMBOS, comboCount, type Selection } from './combos'
 import type { GearSlot } from './gearModel'
@@ -17,7 +18,9 @@ export function GearComposeBody() {
 }
 
 function EmptyPaste() {
-  const { profile, setProfile, phase, error } = useTopGear()
+  const { phase, error } = useTopGear()
+  const profile = useActiveDraft((d) => d.base)
+  const setProfile = useActiveDraft((d) => d.setBase)
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-3 py-12">
       <label
@@ -65,8 +68,9 @@ function defaultActiveKey(slots: GearSlot[]): string {
 }
 
 function CandidatePicker() {
-  const { model, selection, profile, setProfile, error, droppedItems } =
-    useTopGear()
+  const { model, selection, error, droppedItems } = useTopGear()
+  const profile = useActiveDraft((d) => d.base)
+  const setProfile = useActiveDraft((d) => d.setBase)
   const [activeKey, setActiveKey] = useState('')
   if (!model) return null
 

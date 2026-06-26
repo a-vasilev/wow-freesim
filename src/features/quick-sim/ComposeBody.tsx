@@ -1,6 +1,7 @@
 import * as Collapsible from '@radix-ui/react-collapsible'
 import { GearPanel } from '@/features/character/GearPanel'
 import { TalentPanel } from '@/features/character/TalentPanel'
+import { useActiveDraft } from '@/features/session/activeDraftStore'
 import { useQuickSim } from './store'
 import sampleProfile from '@/engine/fixtures/sample-profile.simc?raw'
 
@@ -14,7 +15,9 @@ export function ComposeBody() {
 }
 
 function EmptyPaste() {
-  const { profile, setProfile, phase, error } = useQuickSim()
+  const { phase, error } = useQuickSim()
+  const profile = useActiveDraft((d) => d.base)
+  const setProfile = useActiveDraft((d) => d.setBase)
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-3 py-12">
       <label
@@ -55,7 +58,9 @@ function EmptyPaste() {
 }
 
 function ReadyPreview() {
-  const { character, profile, setProfile, phase, error } = useQuickSim()
+  const { character, phase, error } = useQuickSim()
+  const profile = useActiveDraft((d) => d.base)
+  const setProfile = useActiveDraft((d) => d.setBase)
   if (!character) return null
   return (
     <div className="flex flex-col gap-5">

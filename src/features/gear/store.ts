@@ -1,15 +1,16 @@
 import { create } from 'zustand'
 import {
-  DEFAULT_SIM_OPTIONS,
   EngineCancelledError,
   getEngine,
   type ParsedCharacter,
   type ProfilesetReport,
   type Progress,
-  type SimOptions,
 } from '@/engine'
 import { looksLikeProfile } from '@/lib/simcProfile'
 import { withThreadPref } from '@/features/sim-options/threads-store'
+import { useSimOptions } from '@/features/sim-options/simOptionsStore'
+import { useActiveDraft } from '@/features/session/activeDraftStore'
+import { buildProfileFromDraft } from '@/features/characters/buildProfile'
 import {
   MAX_COMBOS,
   comboCount,
@@ -38,14 +39,18 @@ export interface DroppedItem {
   name?: string
 }
 
+/**
+ * Tab-local Top Gear state ONLY. The working profile and fight settings live in
+ * the shared stores (`useActiveDraft` + `useSimOptions`, CHARACTER_PERSISTENCE
+ * §5.2) — so a paste in Quick Sim is already here. The gear model, selection,
+ * report and plans below are per-tab and must not bleed across tabs.
+ */
 interface GearState {
   phase: GearPhase
-  profile: string
   /** Identity for the context bar (from inspect()); model drives Top Gear itself. */
   character: ParsedCharacter | null
   model: GearModel | null
   selection: Selection
-  options: SimOptions
   progress: Progress | null
   report: ProfilesetReport | null
   /** Plans for the in-flight / last run — maps result names → changed items. */
@@ -54,8 +59,6 @@ interface GearState {
   droppedItems: DroppedItem[]
   error: string | null
 
-  setProfile: (profile: string) => void
-  setOptions: (options: SimOptions) => void
   toggleCandidate: (slotKey: string, uid: string) => void
   inspect: () => Promise<void>
   run: () => Promise<void>
@@ -64,25 +67,25 @@ interface GearState {
   reset: () => void
 }
 
+/** The shared working profile, composed through the `buildProfile` seam (§5.3). */
+function currentProfile(): string {
+  return buildProfileFromDraft(useActiveDraft.getState())
+}
+
 // Guards against a stale inspect (paste edited again mid-flight) clobbering newer
 // state — only the latest inspect's results are applied.
 let inspectGen = 0
 
 export const useTopGear = create<GearState>((set, get) => ({
   phase: 'empty',
-  profile: '',
   character: null,
   model: null,
   selection: {},
-  options: DEFAULT_SIM_OPTIONS,
   progress: null,
   report: null,
   plans: [],
   droppedItems: [],
   error: null,
-
-  setProfile: (profile) => set({ profile }),
-  setOptions: (options) => set({ options }),
 
   toggleCandidate: (slotKey, uid) => {
     const current = get().selection[slotKey] ?? []
@@ -93,7 +96,8 @@ export const useTopGear = create<GearState>((set, get) => ({
   },
 
   inspect: async () => {
-    const { profile, options } = get()
+    const profile = currentProfile()
+    const options = useSimOptions.getState().options
     if (!looksLikeProfile(profile)) return
     const model = parseGearModel(profile)
     if (!model.slots.length) {
@@ -132,8 +136,10 @@ export const useTopGear = create<GearState>((set, get) => ({
   },
 
   run: async () => {
-    const { model, options, profile, phase, selection } = get()
+    const { model, phase, selection } = get()
     if (phase === 'running' || !model) return
+    const profile = currentProfile()
+    const options = useSimOptions.getState().options
 
     if (comboCount(model, selection) > MAX_COMBOS) {
       set({
@@ -179,10 +185,10 @@ export const useTopGear = create<GearState>((set, get) => ({
 
   edit: () => set({ phase: get().model ? 'ready' : 'empty' }),
 
+  // Tab-local reset only — the shared draft (the working profile) is left intact.
   reset: () =>
     set({
       phase: 'empty',
-      profile: '',
       character: null,
       model: null,
       selection: {},

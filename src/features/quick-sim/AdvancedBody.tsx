@@ -1,4 +1,5 @@
 import { SimcEditor } from '@/features/advanced/SimcEditor'
+import { useActiveDraft } from '@/features/session/activeDraftStore'
 import { useQuickSim } from './store'
 import sampleProfile from '@/engine/fixtures/sample-profile.simc?raw'
 
@@ -8,7 +9,9 @@ import sampleProfile from '@/engine/fixtures/sample-profile.simc?raw'
  * runs the profile directly via the context bar / the inline Run button.
  */
 export function AdvancedBody() {
-  const { profile, setProfile, run, error } = useQuickSim()
+  const { run, error } = useQuickSim()
+  const profile = useActiveDraft((d) => d.base)
+  const setProfile = useActiveDraft((d) => d.setBase)
 
   return (
     <div className="flex flex-col gap-4">

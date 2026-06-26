@@ -2,6 +2,10 @@ import { useEffect } from 'react'
 import { ContentHeader, SubTab } from '@/app/components/ContentHeader'
 import { SaveToHistory } from '@/features/history/SaveToHistory'
 import { SimOptionChips } from '@/features/sim-options/SimOptionChips'
+import { useSimOptions } from '@/features/sim-options/simOptionsStore'
+import { useActiveDraft } from '@/features/session/activeDraftStore'
+import { CharacterSwitcher } from '@/features/characters/CharacterSwitcher'
+import { SaveCharacterControl } from '@/features/characters/SaveCharacterControl'
 import { ReportView } from '@/features/report/ReportView'
 import { AdvancedBody } from './AdvancedBody'
 import { ComposeBody } from './ComposeBody'
@@ -16,21 +20,26 @@ import { looksLikeProfile, useQuickSim } from './store'
  */
 export function QuickSim() {
   const s = useQuickSim()
-  const { phase, mode, profile, inspect } = s
+  const { phase, mode, inspect } = s
+  // The working profile comes from the shared active draft (§5.2); the auto-inspect
+  // keys on its `base` text.
+  const base = useActiveDraft((d) => d.base)
+  const options = useSimOptions((o) => o.options)
+  const setOptions = useSimOptions((o) => o.setOptions)
 
   // Debounced auto-inspect, COMPOSE mode only (§6.2). Keyed on the profile only:
   // depending on phase would loop (inspect flips phase ready→…→ready). The phase
   // is re-checked at fire time so we don't inspect during a run/report. Advanced
   // mode skips the preview — its editor body runs the profile directly.
   useEffect(() => {
-    if (mode !== 'compose' || !looksLikeProfile(profile)) return
+    if (mode !== 'compose' || !looksLikeProfile(base)) return
     const t = setTimeout(() => {
       const ph = useQuickSim.getState().phase
       if (ph === 'running' || ph === 'report') return
       inspect()
     }, 600)
     return () => clearTimeout(t)
-  }, [profile, mode, inspect])
+  }, [base, mode, inspect])
 
   const isReport = phase === 'report'
   const showContextBar =
@@ -41,6 +50,7 @@ export function QuickSim() {
       <ContentHeader
         title="Quick Sim"
         crumb={isReport ? 'Report' : undefined}
+        lead={<CharacterSwitcher />}
         tabs={
           isReport ? undefined : (
             <>
@@ -62,8 +72,8 @@ export function QuickSim() {
         right={
           <>
             <SimOptionChips
-              options={s.options}
-              onChange={isReport ? undefined : s.setOptions}
+              options={options}
+              onChange={isReport ? undefined : setOptions}
               readOnly={isReport}
             />
             {isReport && (
@@ -93,7 +103,12 @@ export function QuickSim() {
                 </span>
               )}
             </div>
-            <ContextAction />
+            <div className="flex items-center gap-3">
+              {phase !== 'running' && (
+                <SaveCharacterControl character={s.character} />
+              )}
+              <ContextAction />
+            </div>
           </div>
         )}
 
@@ -101,10 +116,9 @@ export function QuickSim() {
           <ReportView
             report={s.report}
             actions={
-              <SaveToHistory
-                report={s.report}
-                source={{ profile: s.profile, options: s.options }}
-              />
+              s.source && (
+                <SaveToHistory report={s.report} source={s.source} />
+              )
             }
           />
         ) : phase === 'running' ? (

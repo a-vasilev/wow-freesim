@@ -74,6 +74,36 @@ export function AdvancedIcon(props: IconProps) {
   )
 }
 
+/** Characters — a roster of two people. */
+export function RosterIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="6" cy="5.5" r="2.2" />
+      <path d="M2.5 13c0-2 1.6-3.4 3.5-3.4S9.5 11 9.5 13" />
+      <path d="M10.5 4.2a2 2 0 0 1 0 3.8" />
+      <path d="M11 9.7c1.6.2 2.9 1.5 2.9 3.3" />
+    </Icon>
+  )
+}
+
+/** Chevron — affordance for a drill-in / dropdown (§7). */
+export function ChevronDownIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 6l4 4 4-4" />
+    </Icon>
+  )
+}
+
+/** Chevron — drill into a sub-step (right-facing). */
+export function ChevronRightIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M6 4l4 4-4 4" />
+    </Icon>
+  )
+}
+
 /** Settings — gear cog. */
 export function SettingsIcon(props: IconProps) {
   return (
