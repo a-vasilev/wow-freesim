@@ -98,6 +98,10 @@ export const useQuickSim = create<QuickSimState>((set, get) => ({
       })
       set({ character, phase: 'ready' })
     } catch (e) {
+      // A superseded inspect (a newer inspect/run took the single worker) is not a
+      // real failure — the superseding op owns the state now, so stay silent rather
+      // than flashing a "cancelled" error. Mirrors run()'s cancellation handling.
+      if (e instanceof EngineCancelledError) return
       set({
         phase: get().character ? 'ready' : 'empty',
         error: messageOf(e),

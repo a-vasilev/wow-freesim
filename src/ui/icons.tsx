@@ -24,6 +24,15 @@ function Icon({ children, ...props }: IconProps) {
   )
 }
 
+/** Start a sim — a play glyph (the entry point into the source → scenario flow). */
+export function StartIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M5 3.5v9l7-4.5-7-4.5z" />
+    </Icon>
+  )
+}
+
 /** Quick Sim — lightning bolt (DESIGN_SYSTEM §7 reference glyph). */
 export function QuickSimIcon(props: IconProps) {
   return (

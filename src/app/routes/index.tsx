@@ -1,6 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { ContentHeader } from '@/app/components/ContentHeader'
-import { GearIcon, QuickSimIcon } from '@/ui/icons'
 import {
   hardwareConcurrency,
   isCrossOriginIsolated,
@@ -17,20 +16,7 @@ function HomePage() {
       <section className="mx-auto flex w-full max-w-4xl flex-col gap-12 px-7 py-10">
         <Hero />
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <LaunchCard
-            to="/quick-sim"
-            icon={<QuickSimIcon className="size-5" />}
-            title="Quick Sim"
-            desc="Paste one /simc string and get a full DPS report — headline, ability breakdown, and uptimes."
-          />
-          <LaunchCard
-            to="/gear"
-            icon={<GearIcon className="size-5" />}
-            title="Top Gear"
-            desc="Sim every combination of the gear you already own in bags & bank, ranked by DPS."
-          />
-        </div>
+        <StartCta />
 
         <GettingStarted />
       </section>
@@ -51,41 +37,34 @@ function Hero() {
       <p className="text-fg-muted max-w-2xl text-base">
         iLvl runs SimulationCraft entirely in your browser via WebAssembly — no
         queue, no server farm, no waiting in line. Your CPU does the work, so it
-        stays fast and free. Paste your <code className="font-mono">/simc</code>{' '}
-        string to begin.
+        stays fast and free. Load your character to begin.
       </p>
       <SystemStatus />
     </div>
   )
 }
 
-function LaunchCard({
-  to,
-  icon,
-  title,
-  desc,
-}: {
-  to: string
-  icon: React.ReactNode
-  title: string
-  desc: string
-}) {
+/** The single primary call-to-action — into the character-source step (§ flow). */
+function StartCta() {
   return (
-    <Link
-      to={to}
-      className="group border-border-subtle bg-surface-raised hover:border-accent focus-visible:ring-focus flex flex-col gap-3 rounded-lg border p-5 outline-none transition-colors focus-visible:ring-2"
-    >
-      <span className="bg-accent-subtle text-accent flex size-10 items-center justify-center rounded-md">
-        {icon}
-      </span>
+    <div className="border-border-subtle bg-surface-raised flex flex-col gap-4 rounded-lg border p-6 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex flex-col gap-1">
-        <span className="text-fg group-hover:text-accent flex items-center gap-1.5 font-display text-lg font-semibold transition-colors">
-          {title}
-          <ArrowRight className="size-4 -translate-x-1 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
+        <span className="text-fg font-display text-lg font-semibold">
+          Ready to sim?
         </span>
-        <p className="text-fg-muted text-sm">{desc}</p>
+        <p className="text-fg-muted text-sm">
+          Load a character — saved, a <code className="font-mono">/simc</code>{' '}
+          paste, or an Armory pull — then pick Quick Sim or Top Gear.
+        </p>
       </div>
-    </Link>
+      <Link
+        to="/simulate"
+        className="group bg-accent text-accent-fg hover:bg-accent-hover flex shrink-0 items-center gap-2 rounded-md px-5 py-2.5 text-sm font-semibold tracking-wide uppercase transition-colors"
+      >
+        Start simming
+        <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+      </Link>
+    </div>
   )
 }
 

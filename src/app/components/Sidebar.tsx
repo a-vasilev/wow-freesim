@@ -2,13 +2,7 @@ import type { ComponentType, SVGProps } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useMediaQuery } from '@/lib/useMediaQuery'
 import { EngineStatusChip } from '@/ui/EngineStatusChip'
-import {
-  DroptimizerIcon,
-  GearIcon,
-  HistoryIcon,
-  QuickSimIcon,
-  RosterIcon,
-} from '@/ui/icons'
+import { HistoryIcon, RosterIcon, StartIcon } from '@/ui/icons'
 import { Brand } from './Brand'
 import { useSidebar } from './sidebar-store'
 
@@ -21,17 +15,13 @@ interface NavRoute {
   exact?: boolean
 }
 
-// Live routes (DESIGN_SYSTEM §6 nav order). Droptimizer is Phase 3 and renders as
-// a disabled "Soon" row so the shell matches spec without a dead link.
+// Live routes. The sim scenarios (Quick Sim / Top Gear / Droptimizer) are no longer
+// top-level nav: every sim is reached through the single **Simulate** flow, which
+// picks the character first and then the scenario to run.
 const NAV_ROUTES: NavRoute[] = [
-  { to: '/quick-sim', label: 'Quick Sim', icon: QuickSimIcon },
-  { to: '/gear', label: 'Top Gear', icon: GearIcon },
+  { to: '/simulate', label: 'Simulate', icon: StartIcon },
   { to: '/characters', label: 'Characters', icon: RosterIcon },
   { to: '/history', label: 'History', icon: HistoryIcon },
-]
-
-const SOON_ROUTES: { label: string; icon: IconType }[] = [
-  { label: 'Droptimizer', icon: DroptimizerIcon },
 ]
 
 /**
@@ -64,14 +54,6 @@ export function Sidebar() {
       <nav className="flex flex-1 flex-col gap-0.5 py-3">
         {NAV_ROUTES.map((r) => (
           <NavItem key={r.to} route={r} collapsed={collapsed} />
-        ))}
-        {SOON_ROUTES.map((r) => (
-          <SoonItem
-            key={r.label}
-            label={r.label}
-            icon={r.icon}
-            collapsed={collapsed}
-          />
         ))}
       </nav>
 
@@ -119,36 +101,6 @@ function NavItem({
         </>
       )}
     </Link>
-  )
-}
-
-function SoonItem({
-  label,
-  icon: Icon,
-  collapsed,
-}: {
-  label: string
-  icon: IconType
-  collapsed: boolean
-}) {
-  return (
-    <div
-      className={`text-fg-faint flex cursor-not-allowed items-center text-sm select-none ${
-        collapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-5 py-2.5'
-      }`}
-      aria-disabled="true"
-      title={collapsed ? `${label} — coming soon` : `${label} — coming in a later phase`}
-    >
-      <Icon className="size-4 shrink-0" />
-      {!collapsed && (
-        <>
-          <span>{label}</span>
-          <span className="border-border-subtle text-fg-faint ml-auto rounded-full border px-1.5 py-0.5 text-xs tracking-wide uppercase">
-            Soon
-          </span>
-        </>
-      )}
-    </div>
   )
 }
 

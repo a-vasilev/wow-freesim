@@ -23,7 +23,13 @@ const REGIONS: { value: ArmoryRegion; label: string }[] = [
  * loadout code (broken since 11.2); we surface that as a non-blocking notice rather
  * than failing the import.
  */
-export function ArmoryImportForm() {
+export function ArmoryImportForm({
+  onImported,
+}: {
+  /** Called after a successful import has written the profile to the draft. The
+   *  source-step wizard uses this to advance to the found-character confirmation. */
+  onImported?: () => void
+} = {}) {
   const setBase = useActiveDraft((d) => d.setBase)
   const [region, setRegion] = useState<ArmoryRegion>('us')
   const [realm, setRealm] = useState('')
@@ -48,6 +54,7 @@ export function ArmoryImportForm() {
       })
       setBase(profile)
       setTalentNotice(!hasTalents)
+      onImported?.()
     } catch (err) {
       setError(
         err instanceof ArmoryError

@@ -3,63 +3,27 @@ import * as Collapsible from '@radix-ui/react-collapsible'
 import { ItemCell } from '@/ui/item/ItemCell'
 import { WowheadAttribution } from '@/ui/wowhead'
 import { useActiveDraft } from '@/features/session/activeDraftStore'
-import sampleProfile from '@/engine/fixtures/sample-profile.simc?raw'
+import { looksLikeProfile } from '@/lib/simcProfile'
+import { NoCharacterRedirect } from '@/features/start/NoCharacterRedirect'
 import { MAX_COMBOS, WARN_COMBOS, comboCount, type Selection } from './combos'
 import type { GearSlot } from './gearModel'
 import { useTopGear } from './store'
 
-/** Compose-screen body: empty paste box, or the two-pane picker (§7 / 2a). */
+/**
+ * Compose-screen body: the two-pane candidate picker once a character is loaded,
+ * a brief scanning note while inspect() runs, otherwise a redirect to the `/start`
+ * source step (the paste box now lives there, not per-scenario) (§7 / 2a).
+ */
 export function GearComposeBody() {
   const { phase, model } = useTopGear()
+  const base = useActiveDraft((d) => d.base)
   if (model && (phase === 'ready' || phase === 'inspecting')) {
     return <CandidatePicker />
   }
-  return <EmptyPaste />
-}
-
-function EmptyPaste() {
-  const { phase, error } = useTopGear()
-  const profile = useActiveDraft((d) => d.base)
-  const setProfile = useActiveDraft((d) => d.setBase)
-  return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-3 py-12">
-      <label
-        htmlFor="gear-paste"
-        className="text-fg font-display text-sm font-semibold"
-      >
-        Paste your SimulationCraft string
-      </label>
-      <p className="text-fg-muted text-sm">
-        Paste the string from the SimulationCraft in-game addon (
-        <code className="font-mono">/simc</code>). Enable{' '}
-        <span className="text-fg-subtle">bags &amp; bank</span> in the addon to
-        find the best combination of gear you already own.
-      </p>
-      <textarea
-        id="gear-paste"
-        value={profile}
-        onChange={(e) => setProfile(e.target.value)}
-        spellCheck={false}
-        placeholder={'warrior="My Character"\nlevel=80\n…'}
-        className="bg-surface-inset border-border-subtle text-fg placeholder:text-fg-faint focus-visible:border-border h-56 w-full resize-y rounded-lg border p-4 font-mono text-sm outline-none"
-      />
-      <div className="flex items-center gap-3">
-        {phase === 'inspecting' && (
-          <span className="text-fg-subtle text-sm">Inspecting…</span>
-        )}
-        {error && <span className="text-danger text-sm">{error}</span>}
-        {import.meta.env.DEV && (
-          <button
-            type="button"
-            onClick={() => setProfile(sampleProfile)}
-            className="text-fg-faint hover:text-fg-muted ml-auto text-xs underline"
-          >
-            Load example
-          </button>
-        )}
-      </div>
-    </div>
-  )
+  if (looksLikeProfile(base)) {
+    return <p className="text-fg-subtle py-12 text-center text-sm">Scanning…</p>
+  }
+  return <NoCharacterRedirect scenario="find your best gear" />
 }
 
 /** First slot that has alternatives to consider, else the first slot. */
